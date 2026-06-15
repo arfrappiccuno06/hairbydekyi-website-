@@ -1,15 +1,44 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import Header from './components/Header';
 import Calendar from './components/Calendar';
 import TimeSlotPicker from './components/TimeSlotPicker';
 import SelectionSummary from './components/SelectionSummary';
 import Footer from './components/Footer';
+import { fetchAvailability } from './utils/api';
 
 function App() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlots, setSelectedSlots] = useState([]);
   const [showMenu, setShowMenu] = useState(false);
+  const [availability, setAvailability] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  // Fetch availability data when month changes
+  useEffect(() => {
+    const loadAvailability = async () => {
+      setLoading(true);
+      setError(null);
+
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth() + 1;
+
+      const { data, error: apiError } = await fetchAvailability(year, month);
+
+      if (apiError) {
+        setError(apiError);
+        setLoading(false);
+        return;
+      }
+
+      setAvailability(data.availability || {});
+      setLoading(false);
+    };
+
+    loadAvailability();
+  }, [currentMonth]);
 
   const handleDateSelect = (date) => {
     setSelectedDate(date);
@@ -66,6 +95,11 @@ function App() {
             selectedDate={selectedDate}
             onDateSelect={handleDateSelect}
             selectedSlots={selectedSlots}
+            availability={availability}
+            loading={loading}
+            error={error}
+            currentMonth={currentMonth}
+            onMonthChange={setCurrentMonth}
           />
 
           {selectedDate && (
@@ -73,6 +107,7 @@ function App() {
               selectedDate={selectedDate}
               selectedSlots={selectedSlots}
               onSlotToggle={handleSlotToggle}
+              availability={availability}
             />
           )}
 

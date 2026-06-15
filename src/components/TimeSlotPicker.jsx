@@ -1,16 +1,15 @@
 import React from 'react';
 import './TimeSlotPicker.css';
-import { getAvailableSlots } from '../data/mockAvailability';
 
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-const TimeSlotPicker = ({ selectedDate, selectedSlots, onSlotToggle }) => {
+const TimeSlotPicker = ({ selectedDate, selectedSlots, onSlotToggle, availability }) => {
   if (!selectedDate) {
     return null;
   }
 
-  const slots = getAvailableSlots(selectedDate);
+  const slots = availability[selectedDate] || [];
 
   if (slots.length === 0) {
     return null;
