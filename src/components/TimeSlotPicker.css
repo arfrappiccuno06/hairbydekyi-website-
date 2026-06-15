@@ -1,0 +1,76 @@
+.timeslot-card {
+  background: var(--bg-card);
+  border-radius: 24px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 12px rgba(90, 74, 65, 0.08);
+  margin-bottom: 1.5rem;
+}
+
+.timeslot-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: var(--text-dark);
+  margin: 0 0 0.5rem 0;
+}
+
+.timeslot-date {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0 0 1.5rem 0;
+  font-weight: 300;
+}
+
+.timeslot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.timeslot-button {
+  padding: 0.875rem 1rem;
+  background: white;
+  border: 1.5px solid var(--border-color);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 48px; /* Touch-friendly */
+}
+
+.timeslot-button:hover {
+  border-color: var(--accent-pink);
+  background-color: rgba(248, 215, 218, 0.2);
+}
+
+.timeslot-button.selected {
+  background-color: var(--accent-pink);
+  border-color: var(--accent-pink);
+  color: var(--text-dark);
+  font-weight: 500;
+}
+
+@media (min-width: 768px) {
+  .timeslot-card {
+    padding: 2rem;
+  }
+
+  .timeslot-title {
+    font-size: 1.75rem;
+  }
+
+  .timeslot-date {
+    font-size: 1rem;
+  }
+
+  .timeslot-grid {
+    gap: 1rem;
+  }
+
+  .timeslot-button {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+}
