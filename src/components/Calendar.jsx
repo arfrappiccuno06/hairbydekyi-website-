@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import './Calendar.css';
-import { hasAvailability } from '../data/mockAvailability';
 
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTHS = [
@@ -8,8 +7,7 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const Calendar = ({ selectedDate, onDateSelect, selectedSlots }) => {
-  const [currentMonth, setCurrentMonth] = useState(new Date()); // Current month and year
+const Calendar = ({ selectedDate, onDateSelect, selectedSlots, availability, loading, error, currentMonth, onMonthChange }) => {
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -33,11 +31,15 @@ const Calendar = ({ selectedDate, onDateSelect, selectedSlots }) => {
   const month = currentMonth.getMonth();
 
   const prevMonth = () => {
-    setCurrentMonth(new Date(year, month - 1));
+    onMonthChange(new Date(year, month - 1));
   };
 
   const nextMonth = () => {
-    setCurrentMonth(new Date(year, month + 1));
+    onMonthChange(new Date(year, month + 1));
+  };
+
+  const hasAvailability = (dateString) => {
+    return availability[dateString] && availability[dateString].length > 0;
   };
 
   const handleDayClick = (day) => {
@@ -87,6 +89,16 @@ const Calendar = ({ selectedDate, onDateSelect, selectedSlots }) => {
     return days;
   };
 
+  // Error state
+  if (error) {
+    return (
+      <div className="calendar-card calendar-error">
+        <p className="error-title">Unable to load availability</p>
+        <p className="error-message">Please DM us on Instagram @hairbydekyi to book your appointment</p>
+      </div>
+    );
+  }
+
   return (
     <div className="calendar-card">
       <div className="calendar-header">
@@ -107,25 +119,33 @@ const Calendar = ({ selectedDate, onDateSelect, selectedSlots }) => {
         </div>
       </div>
 
-      <div className="calendar-grid">
-        {DAYS.map(day => (
-          <div key={day} className="calendar-weekday">
-            {day}
+      {loading ? (
+        <div className="calendar-loading">
+          <p>Loading availability...</p>
+        </div>
+      ) : (
+        <>
+          <div className="calendar-grid">
+            {DAYS.map(day => (
+              <div key={day} className="calendar-weekday">
+                {day}
+              </div>
+            ))}
+            {renderCalendarDays()}
           </div>
-        ))}
-        {renderCalendarDays()}
-      </div>
 
-      <div className="calendar-legend">
-        <div className="legend-item">
-          <span className="legend-indicator available"></span>
-          <span className="legend-label">Available</span>
-        </div>
-        <div className="legend-item">
-          <span className="legend-indicator selected"></span>
-          <span className="legend-label">Selected</span>
-        </div>
-      </div>
+          <div className="calendar-legend">
+            <div className="legend-item">
+              <span className="legend-indicator available"></span>
+              <span className="legend-label">Available</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-indicator selected"></span>
+              <span className="legend-label">Selected</span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
