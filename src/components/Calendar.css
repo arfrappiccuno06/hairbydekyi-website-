@@ -142,6 +142,37 @@
   color: var(--text-primary);
 }
 
+.calendar-loading {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-loading p {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.calendar-error {
+  text-align: center;
+  padding: 3rem 1.5rem;
+}
+
+.error-title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--text-dark);
+  margin-bottom: 0.5rem;
+}
+
+.error-message {
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
 @media (min-width: 768px) {
   .calendar-card {
     padding: 2rem;
