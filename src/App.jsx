@@ -68,10 +68,30 @@ function App() {
 
   const handleConfirm = () => {
     if (selectedSlots.length >= 3) {
-      // Stage 1: Just show an alert
-      // Later stages will redirect to Google Form
-      alert(`Booking confirmed with ${selectedSlots.length} time slot options!\n\nIn Stage 3, this will redirect to the Google Form.`);
-      console.log('Selected slots:', selectedSlots);
+      // Format slots for Google Form
+      const formattedSlots = selectedSlots.slice(0, 3).map(slot => {
+        const date = new Date(slot.date + 'T00:00:00');
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+        const dayName = dayNames[date.getDay()];
+        const monthName = monthNames[date.getMonth()];
+        const dayNum = date.getDate();
+
+        return `${dayName}, ${monthName} ${dayNum} at ${slot.time}`;
+      });
+
+      // Build Google Form URL with pre-filled slots
+      const baseUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSdgsujnW4UAL6WX_ajlHDQWAgVyf-kpQXg_OfAII_Wxovy6Bg/viewform';
+      const params = new URLSearchParams({
+        'usp': 'pp_url',
+        'entry.2028055511': formattedSlots[0] || '',
+        'entry.635753266': formattedSlots[1] || '',
+        'entry.726002966': formattedSlots[2] || ''
+      });
+
+      // Redirect to Google Form
+      window.location.href = `${baseUrl}?${params.toString()}`;
     }
   };
 

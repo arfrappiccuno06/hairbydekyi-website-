@@ -27,4 +27,11 @@ dist-ssr
 .env
 .env.local
 .env.production
+
+#vercel stuff 
 .vercel
+
+#md files 
+
+*.md
+!README.md
