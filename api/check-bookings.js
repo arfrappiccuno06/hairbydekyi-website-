@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { Resend } from 'resend';
+import { generateToken } from '../utils/tokens.js';
 
 export default async function handler(req, res) {
   try {
@@ -19,10 +20,11 @@ export default async function handler(req, res) {
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
 
-    // Read all form responses (A=Timestamp through K=Notified)
+    // Read all form responses (A=Timestamp through P=ProcessedTimestamp)
+    // K=Notified, L=Token, M=Status, N=AcceptedSlot, O=CalendarEventId, P=ProcessedTimestamp
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Form Responses 1!A:K',
+      range: 'Form Responses 1!A:P',
     });
 
     const rows = response.data.values;
@@ -68,22 +70,39 @@ export default async function handler(req, res) {
       const slot2 = row[5] || '';
       const slot3 = row[6] || '';
 
-      // Create email content
+      // Generate token for this booking
+      const token = generateToken();
+      const baseUrl = process.env.BASE_URL || 'http://localhost:5173';
+
+      // Create Accept/Deny links
+      const acceptSlot1Link = `${baseUrl}/api/accept-booking?token=${token}&slot=0`;
+      const acceptSlot2Link = `${baseUrl}/api/accept-booking?token=${token}&slot=1`;
+      const acceptSlot3Link = `${baseUrl}/api/accept-booking?token=${token}&slot=2`;
+      const denyLink = `${baseUrl}/api/deny-booking?token=${token}`;
+
+      // Create email content with Accept/Deny links
       const emailHtml = `
-        <h2>New Booking Request</h2>
+        <h2>New Booking Request from ${name}</h2>
         <p><strong>Submitted:</strong> ${timestamp}</p>
-        <p><strong>Name:</strong> ${name}</p>
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Phone:</strong> ${phone}</p>
 
-        <h3>Requested Time Slots:</h3>
-        <ul>
-          <li>${slot1}</li>
-          <li>${slot2}</li>
-          <li>${slot3}</li>
-        </ul>
+        <h3>Choose ONE slot to accept:</h3>
+        <p><strong>Slot 1:</strong> ${slot1}<br>
+        <a href="${acceptSlot1Link}">Accept Slot 1</a></p>
 
-        <p><a href="https://docs.google.com/spreadsheets/d/1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA/edit">View Google Sheet</a></p>
+        <p><strong>Slot 2:</strong> ${slot2}<br>
+        <a href="${acceptSlot2Link}">Accept Slot 2</a></p>
+
+        <p><strong>Slot 3:</strong> ${slot3}<br>
+        <a href="${acceptSlot3Link}">Accept Slot 3</a></p>
+
+        <hr>
+        <p><a href="${denyLink}">Deny this booking</a></p>
+
+        <p style="margin-top: 30px; font-size: 12px; color: #666;">
+        <a href="https://docs.google.com/spreadsheets/d/1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA/edit">View Google Sheet</a>
+        </p>
       `;
 
       try {
@@ -95,13 +114,29 @@ export default async function handler(req, res) {
           html: emailHtml,
         });
 
-        // Mark as notified in the sheet
-        await sheets.spreadsheets.values.update({
+        // Update Sheet: Mark as notified (K), add token (L), set status to Pending (M)
+        // Column K = Notified, Column L = Token, Column M = Status
+        const rowNumber = i + 1;
+
+        // Update columns K, L, M in a single batch
+        await sheets.spreadsheets.values.batchUpdate({
           spreadsheetId,
-          range: `Form Responses 1!${String.fromCharCode(65 + notifiedColumnIndex)}${i + 1}`,
-          valueInputOption: 'RAW',
           requestBody: {
-            values: [['TRUE']],
+            valueInputOption: 'RAW',
+            data: [
+              {
+                range: `Form Responses 1!K${rowNumber}`,
+                values: [['TRUE']],
+              },
+              {
+                range: `Form Responses 1!L${rowNumber}`,
+                values: [[token]],
+              },
+              {
+                range: `Form Responses 1!M${rowNumber}`,
+                values: [['Pending']],
+              },
+            ],
           },
         });
 
