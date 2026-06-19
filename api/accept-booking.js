@@ -96,6 +96,9 @@ export default async function handler(req, res) {
       bookingData[5] || '', // Slot 2
       bookingData[6] || '', // Slot 3
     ];
+    const serviceDescription = bookingData[7] || ''; // Column H
+    const referencePhotos = bookingData[8] || ''; // Column I
+    const depositScreenshot = bookingData[9] || ''; // Column J
     const status = bookingData[12] || ''; // Column M
 
     // Idempotency check
@@ -195,10 +198,19 @@ export default async function handler(req, res) {
       `);
     }
 
-    // Create Calendar event
+    // Create Calendar event with detailed description
+    const descriptionParts = [
+      `Client: ${name}`,
+      `Email: ${email}`,
+      `Phone: ${phone}`,
+      `\nService Description: ${serviceDescription}`,
+      `\nReference Photos: ${referencePhotos || 'NOT PROVIDED'}`,
+      `\nDeposit Screenshot: ${depositScreenshot}`,
+    ];
+
     const event = {
       summary: `Hair Appointment - ${name}`,
-      description: `Client: ${name}\nEmail: ${email}\nPhone: ${phone}`,
+      description: descriptionParts.join('\n'),
       start: {
         dateTime: startDateTime,
         timeZone: 'America/Toronto',
