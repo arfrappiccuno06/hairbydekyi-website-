@@ -67,8 +67,27 @@ export default async function handler(req, res) {
     const currentDate = new Date(startOfMonth);
 
     // Get current time in Toronto timezone
-    const nowInToronto = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Toronto' }));
-    const todayString = nowInToronto.toISOString().split('T')[0];
+    const nowUTC = new Date();
+
+    // Get current Toronto date/time components
+    const torontoFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Toronto',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+
+    const torontoParts = torontoFormatter.formatToParts(nowUTC);
+    const torontoYear = torontoParts.find(p => p.type === 'year').value;
+    const torontoMonth = torontoParts.find(p => p.type === 'month').value;
+    const torontoDay = torontoParts.find(p => p.type === 'day').value;
+    const torontoHour = parseInt(torontoParts.find(p => p.type === 'hour').value);
+    const torontoMinute = parseInt(torontoParts.find(p => p.type === 'minute').value);
+
+    const todayString = `${torontoYear}-${torontoMonth}-${torontoDay}`;
 
     while (currentDate <= endOfMonth) {
       const dayOfWeek = currentDate.getDay();
@@ -77,7 +96,7 @@ export default async function handler(req, res) {
       // Skip weekends (0 = Sunday, 6 = Saturday)
       // Skip dates in the past (before today)
       if (dayOfWeek !== 0 && dayOfWeek !== 6 && dateString >= todayString) {
-        availability[dateString] = generateDailySlots(currentDate, events, nowInToronto, dateString === todayString);
+        availability[dateString] = generateDailySlots(currentDate, events, dateString === todayString, torontoHour, torontoMinute);
       }
 
       currentDate.setDate(currentDate.getDate() + 1);
@@ -104,7 +123,7 @@ export default async function handler(req, res) {
 }
 
 // Generate time slots for a given day (9 AM - 6 PM, 1.5 hour slots)
-function generateDailySlots(date, busyEvents, nowInToronto, isToday) {
+function generateDailySlots(date, busyEvents, isToday, currentTorontoHour, currentTorontoMinute) {
   const slots = [];
   const dateString = date.toISOString().split('T')[0];
 
@@ -125,8 +144,14 @@ function generateDailySlots(date, busyEvents, nowInToronto, isToday) {
     const slotEnd = new Date(slotStart.getTime() + 90 * 60 * 1000); // Add 90 minutes
 
     // Skip past time slots for today
-    if (isToday && slotStart <= nowInToronto) {
-      continue;
+    // Compare hours and minutes directly in Toronto timezone
+    if (isToday) {
+      const currentTimeInMinutes = currentTorontoHour * 60 + currentTorontoMinute;
+      const slotTimeInMinutes = slot.hour * 60 + slot.minute;
+
+      if (slotTimeInMinutes <= currentTimeInMinutes) {
+        continue; // Slot has passed
+      }
     }
 
     // Check if slot overlaps with any busy event
