@@ -1,0 +1,70 @@
+.pricing-page {
+  min-height: calc(100vh - 200px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+
+.pricing-content {
+  max-width: 600px;
+  text-align: center;
+}
+
+.pricing-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.5rem;
+  color: var(--text-dark);
+  margin-bottom: 1.5rem;
+  opacity: 1;
+}
+
+.pricing-text {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.125rem;
+  color: var(--text-dark);
+  opacity: 1;
+}
+
+.pricing-item {
+  background-color: rgba(248, 215, 218, 0.7);
+  padding: 2rem;
+  border-radius: 12px;
+  margin-bottom: 0;
+}
+
+.pricing-divider {
+  height: 3px;
+  background-color: #F8D7DA;
+  margin: 1.5rem 0;
+}
+
+.service-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.75rem;
+  color: var(--text-dark);
+  margin-bottom: 0.75rem;
+  opacity: 1;
+}
+
+.service-price {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin: 0;
+  opacity: 1;
+}
+
+.pricing-footnote {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.875rem;
+  color: var(--text-dark);
+  font-style: italic;
+  line-height: 1.6;
+  padding: 1.5rem;
+  background-color: rgba(248, 215, 218, 0.7);
+  border-radius: 12px;
+  margin-top: 0;
+  opacity: 1;
+}

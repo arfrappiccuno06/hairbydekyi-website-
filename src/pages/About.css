@@ -1,0 +1,82 @@
+.about-page {
+  min-height: calc(100vh - 200px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+}
+
+.about-content {
+  max-width: 600px;
+  text-align: center;
+  background-color: rgba(254, 252, 250, 0.98);
+  padding: 3rem 2.5rem;
+  position: relative;
+  border-radius: 16px;
+}
+
+.about-text {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.125rem;
+  line-height: 1.8;
+  color: #5A4A41;
+  margin: 0;
+  max-width: 400px;
+}
+
+.instagram-link {
+  color: #8B6D7B;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.instagram-link:hover {
+  color: #F8D7DA;
+  text-decoration: underline;
+}
+
+.typing-cursor {
+  font-weight: 400;
+  animation: blink 1s infinite;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+/* Mobile optimization */
+@media (max-width: 375px) {
+  .about-page {
+    padding: 2rem 1rem;
+  }
+
+  .about-content {
+    padding: 2rem 1.5rem;
+  }
+
+  .about-text {
+    font-size: 1rem;
+  }
+}
+
+/* Tablet and up */
+@media (min-width: 768px) {
+  .about-page {
+    padding: 3rem 2rem;
+  }
+
+  .about-content {
+    padding: 3.5rem 3rem;
+  }
+
+  .about-text {
+    font-size: 1.25rem;
+  }
+}

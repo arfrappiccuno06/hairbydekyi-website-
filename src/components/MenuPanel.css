@@ -1,0 +1,94 @@
+/* Menu overlay - darkens background when menu is open */
+.menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 200;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Menu panel - slides in from left */
+.menu-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  max-width: 80vw;
+  background-color: rgba(254, 252, 250, 0.98);
+  box-shadow: 2px 0 8px rgba(90, 74, 65, 0.15);
+  z-index: 201;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  padding-top: 80px; /* Space below header */
+}
+
+.menu-panel-open {
+  transform: translateX(0);
+}
+
+/* Menu navigation */
+.menu-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0;
+}
+
+.menu-link {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  color: #5A4A41;
+  text-decoration: none;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid rgba(139, 109, 123, 0.1);
+  transition: background-color 0.2s, color 0.2s;
+  min-height: 48px; /* Tap target */
+  display: flex;
+  align-items: center;
+}
+
+.menu-link:hover {
+  background-color: rgba(248, 215, 218, 0.3);
+  color: var(--available);
+}
+
+.menu-link:first-child {
+  border-top: 1px solid rgba(139, 109, 123, 0.1);
+}
+
+/* Mobile optimization */
+@media (max-width: 375px) {
+  .menu-panel {
+    width: 260px;
+  }
+
+  .menu-link {
+    font-size: 0.9375rem;
+    padding: 1rem 1.5rem;
+  }
+}
+
+/* Tablet and up */
+@media (min-width: 768px) {
+  .menu-panel {
+    width: 320px;
+  }
+
+  .menu-link {
+    font-size: 1.0625rem;
+    padding: 1.25rem 2.5rem;
+  }
+}

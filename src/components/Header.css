@@ -5,7 +5,7 @@
   background-color: rgba(254, 252, 250, 0.95);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 300;
   box-shadow: 0 1px 4px rgba(90, 74, 65, 0.08);
 }
 
@@ -24,6 +24,29 @@
 
 .menu-button:hover {
   color: var(--text-dark);
+}
+
+/* Animated menu icon lines */
+.menu-line {
+  transition: all 0.3s ease;
+  stroke-linecap: round;
+}
+
+/* Menu open state - transform to X */
+.menu-button.menu-open .menu-line.top {
+  transform: translate(0px, 6px) rotate(45deg);
+  transform-origin: center;
+}
+
+.menu-button.menu-open .menu-line.middle {
+  transform: translateX(3px) rotate(90deg);
+  transform-origin: center;
+  opacity: 1;
+}
+
+.menu-button.menu-open .menu-line.bottom {
+  transform: translate(0px, -5px) rotate(-45deg);
+  transform-origin: center;
 }
 
 .logo {
