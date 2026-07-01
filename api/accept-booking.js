@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { Resend } from 'resend';
+import { generateToken } from '../utils/tokens.js';
 
 export default async function handler(req, res) {
   try {
@@ -49,7 +50,7 @@ export default async function handler(req, res) {
     // Read all rows to find the matching token
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Form Responses 1!A:P',
+      range: 'Booking Form!A:T',
     });
 
     const rows = response.data.values;
@@ -98,16 +99,15 @@ export default async function handler(req, res) {
     ];
     const serviceDescription = bookingData[7] || ''; // Column H
     const referencePhotos = bookingData[8] || ''; // Column I
-    const depositScreenshot = bookingData[9] || ''; // Column J
     const status = bookingData[12] || ''; // Column M
 
     // Idempotency check
-    if (status !== 'Pending') {
+    if (status !== 'pending_acceptance') {
       return res.status(200).send(`
         <html>
           <body>
             <h1>Booking Already Processed</h1>
-            <p>This booking has already been ${status.toLowerCase()}.</p>
+            <p>This booking has already been ${status.toLowerCase().replace('_', ' ')}.</p>
             <p><strong>Client:</strong> ${name}</p>
             <p><strong>Status:</strong> ${status}</p>
           </body>
@@ -177,7 +177,7 @@ export default async function handler(req, res) {
       const rowNumber = matchingRowIndex + 1;
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `Form Responses 1!M${rowNumber}`,
+        range: `Booking Form!M${rowNumber}`,
         valueInputOption: 'RAW',
         requestBody: {
           values: [['Conflict']],
@@ -198,18 +198,19 @@ export default async function handler(req, res) {
       `);
     }
 
-    // Create Calendar event with detailed description
+    // Create TEMPORARY Calendar event (24-hour hold)
     const descriptionParts = [
+      `TEMPORARY HOLD - PENDING DEPOSIT`,
       `Client: ${name}`,
       `Email: ${email}`,
       `Phone: ${phone}`,
       `\nService Description: ${serviceDescription}`,
       `\nReference Photos: ${referencePhotos || 'NOT PROVIDED'}`,
-      `\nDeposit Screenshot: ${depositScreenshot}`,
+      `\nDeposit deadline: 24 hours from acceptance`,
     ];
 
-    const event = {
-      summary: `Hair Appointment - ${name}`,
+    const tempEvent = {
+      summary: `HOLD: ${name}`,
       description: descriptionParts.join('\n'),
       start: {
         dateTime: startDateTime,
@@ -219,18 +220,32 @@ export default async function handler(req, res) {
         dateTime: endDateTime,
         timeZone: 'America/Toronto',
       },
+      colorId: '11', // Red color to indicate it's temporary
     };
 
-    const createdEvent = await calendar.events.insert({
+    const createdTempEvent = await calendar.events.insert({
       calendarId,
-      requestBody: event,
+      requestBody: tempEvent,
     });
 
-    const eventId = createdEvent.data.id;
+    const tempEventId = createdTempEvent.data.id;
 
-    // Update Sheet: Status=Accepted, AcceptedSlot, CalendarEventId, ProcessedTimestamp
+    // Generate deposit token
+    const depositToken = generateToken();
+
+    // Calculate deposit deadline (24 hours from now)
+    const now = new Date();
+    const depositDeadline = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    // Get deposit form entry ID from env (you'll need to add this)
+    const depositFormUrl = process.env.DEPOSIT_FORM_URL || 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform';
+    const depositTokenEntryId = process.env.DEPOSIT_TOKEN_ENTRY_ID || '123456789';
+
+    // Create pre-filled deposit form link
+    const depositFormLink = `${depositFormUrl}?entry.${depositTokenEntryId}=${depositToken}`;
+
+    // Update Sheet: Status=pending_deposit, AcceptedSlot, CalendarEventId (temp), ProcessedTimestamp (accept time), deposit_token, deposit_deadline
     const rowNumber = matchingRowIndex + 1;
-    const now = new Date().toISOString();
 
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId,
@@ -238,39 +253,55 @@ export default async function handler(req, res) {
         valueInputOption: 'RAW',
         data: [
           {
-            range: `Form Responses 1!M${rowNumber}`,
-            values: [['Accepted']],
+            range: `Booking Form!M${rowNumber}`, // Status
+            values: [['pending_deposit']],
           },
           {
-            range: `Form Responses 1!N${rowNumber}`,
+            range: `Booking Form!N${rowNumber}`, // AcceptedSlot
             values: [[`Slot ${slotIndex + 1}`]],
           },
           {
-            range: `Form Responses 1!O${rowNumber}`,
-            values: [[eventId]],
+            range: `Booking Form!O${rowNumber}`, // CalendarEventId (temp)
+            values: [[tempEventId]],
           },
           {
-            range: `Form Responses 1!P${rowNumber}`,
-            values: [[now]],
+            range: `Booking Form!P${rowNumber}`, // ProcessedTimestamp (accept time)
+            values: [[now.toISOString()]],
+          },
+          {
+            range: `Booking Form!Q${rowNumber}`, // deposit_token
+            values: [[depositToken]],
+          },
+          {
+            range: `Booking Form!R${rowNumber}`, // deposit_deadline
+            values: [[depositDeadline.toISOString()]],
           },
         ],
       },
     });
 
-    // Send confirmation email to client
+    // Send deposit request email to CLIENT
     const resend = new Resend(process.env.RESEND_API_KEY);
 
     await resend.emails.send({
       from: 'Hair by Dekyi <onboarding@resend.dev>',
       to: email,
-      subject: 'Appointment Confirmed!',
+      subject: 'Your appointment request has been approved! ✨',
       html: `
-        <h2>Appointment Confirmed!</h2>
-        <p>Hi ${name},</p>
-        <p>Your appointment has been confirmed for:</p>
-        <h3>${selectedSlot}</h3>
-        <p>We look forward to seeing you!</p>
-        <p>If you need to make any changes, please contact us directly.</p>
+        <h2>Great news, ${name}!</h2>
+        <p>Your requested time slot for <strong>${selectedSlot}</strong> has been approved.</p>
+
+        <h3>Next Step: Submit Your Deposit</h3>
+        <p>To secure your appointment, please submit your $5 deposit within 24 hours:</p>
+        <p><a href="${depositFormLink}" style="display: inline-block; padding: 12px 24px; background-color: #A8BDA8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Submit Deposit Screenshot</a></p>
+
+        <p><strong>⏰ Important:</strong> If we don't receive your deposit within 24 hours, this time slot will become available for others to book.</p>
+
+        <p><strong>Deadline:</strong> ${depositDeadline.toLocaleString('en-US', { timeZone: 'America/Toronto', dateStyle: 'full', timeStyle: 'short' })}</p>
+
+        <p>Questions? Reply to this email or DM us @hairbydekyi on Instagram.</p>
+
+        <p>- Dekyi</p>
       `,
     });
 
@@ -280,9 +311,10 @@ export default async function handler(req, res) {
         <body>
           <h1>Booking Accepted!</h1>
           <p><strong>Client:</strong> ${name}</p>
-          <p><strong>Confirmed Time:</strong> ${selectedSlot}</p>
-          <p>A confirmation email has been sent to ${email}.</p>
-          <p>Calendar event has been created.</p>
+          <p><strong>Approved Time:</strong> ${selectedSlot}</p>
+          <p><strong>Status:</strong> Pending deposit (24-hour hold created)</p>
+          <p>An email has been sent to ${email} with instructions to submit the deposit.</p>
+          <p>The calendar has been temporarily blocked until deposit is received or 24 hours expire.</p>
         </body>
       </html>
     `);

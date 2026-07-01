@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     // Read all rows to find the matching token
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Form Responses 1!A:P',
+      range: 'Booking Form!A:T',
     });
 
     const rows = response.data.values;
@@ -79,12 +79,12 @@ export default async function handler(req, res) {
     const status = bookingData[12] || ''; // Column M
 
     // Idempotency check
-    if (status !== 'Pending') {
+    if (status !== 'pending_acceptance') {
       return res.status(200).send(`
         <html>
           <body>
             <h1>Booking Already Processed</h1>
-            <p>This booking has already been ${status.toLowerCase()}.</p>
+            <p>This booking has already been ${status.toLowerCase().replace('_', ' ')}.</p>
             <p><strong>Client:</strong> ${name}</p>
             <p><strong>Status:</strong> ${status}</p>
           </body>
@@ -102,11 +102,11 @@ export default async function handler(req, res) {
         valueInputOption: 'RAW',
         data: [
           {
-            range: `Form Responses 1!M${rowNumber}`,
+            range: `Booking Form!M${rowNumber}`,
             values: [['Denied']],
           },
           {
-            range: `Form Responses 1!P${rowNumber}`,
+            range: `Booking Form!P${rowNumber}`,
             values: [[now]],
           },
         ],

@@ -20,11 +20,11 @@ export default async function handler(req, res) {
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
 
-    // Read all form responses (A=Timestamp through P=ProcessedTimestamp)
+    // Read all form responses (A=Timestamp through T=deposit_screenshot_url)
     // K=Notified, L=Token, M=Status, N=AcceptedSlot, O=CalendarEventId, P=ProcessedTimestamp
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Form Responses 1!A:P',
+      range: 'Booking Form!A:T',
     });
 
     const rows = response.data.values;
@@ -114,7 +114,7 @@ export default async function handler(req, res) {
           html: emailHtml,
         });
 
-        // Update Sheet: Mark as notified (K), add token (L), set status to Pending (M)
+        // Update Sheet: Mark as notified (K), add token (L), set status to pending_acceptance (M)
         // Column K = Notified, Column L = Token, Column M = Status
         const rowNumber = i + 1;
 
@@ -125,16 +125,16 @@ export default async function handler(req, res) {
             valueInputOption: 'RAW',
             data: [
               {
-                range: `Form Responses 1!K${rowNumber}`,
+                range: `Booking Form!K${rowNumber}`,
                 values: [['TRUE']],
               },
               {
-                range: `Form Responses 1!L${rowNumber}`,
+                range: `Booking Form!L${rowNumber}`,
                 values: [[token]],
               },
               {
-                range: `Form Responses 1!M${rowNumber}`,
-                values: [['Pending']],
+                range: `Booking Form!M${rowNumber}`,
+                values: [['pending_acceptance']],
               },
             ],
           },

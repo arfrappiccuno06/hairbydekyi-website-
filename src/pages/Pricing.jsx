@@ -11,7 +11,7 @@ const Pricing = () => {
         </div>
         <div className="pricing-divider"></div>
         <p className="pricing-footnote">
-          A $5 deposit is required to confirm your appointment. Once your time slot is confirmed, you'll receive an email with a form to submit a screenshot of your deposit. No deposit, no appointment.
+          A $5 deposit is required to confirm your appointment. After your time slot is approved, you'll receive an email with a link to submit your deposit screenshot. You have 24 hours to submit, or the slot will become available again.
         </p>
       </div>
     </div>
