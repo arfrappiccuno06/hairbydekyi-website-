@@ -284,9 +284,9 @@ export default async function handler(req, res) {
     const resend = new Resend(process.env.RESEND_API_KEY);
 
     await resend.emails.send({
-      from: 'Hair by Dekyi <onboarding@resend.dev>',
+      from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
       to: email,
-      subject: 'Your appointment request has been approved! ✨',
+      subject: 'Your appointment request has been approved!',
       html: `
         <h2>Great news, ${name}!</h2>
         <p>Your requested time slot for <strong>${selectedSlot}</strong> has been approved.</p>
@@ -295,7 +295,7 @@ export default async function handler(req, res) {
         <p>To secure your appointment, please submit your $5 deposit within 24 hours:</p>
         <p><a href="${depositFormLink}" style="display: inline-block; padding: 12px 24px; background-color: #A8BDA8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Submit Deposit Screenshot</a></p>
 
-        <p><strong>⏰ Important:</strong> If we don't receive your deposit within 24 hours, this time slot will become available for others to book.</p>
+        <p><strong>Important:</strong> If we don't receive your deposit within 24 hours, this time slot will become available for others to book.</p>
 
         <p><strong>Deadline:</strong> ${depositDeadline.toLocaleString('en-US', { timeZone: 'America/Toronto', dateStyle: 'full', timeStyle: 'short' })}</p>
 

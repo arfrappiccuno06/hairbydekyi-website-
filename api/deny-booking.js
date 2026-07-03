@@ -118,7 +118,7 @@ export default async function handler(req, res) {
     const baseUrl = process.env.BASE_URL || 'http://localhost:5173';
 
     await resend.emails.send({
-      from: 'Hair by Dekyi <onboarding@resend.dev>',
+      from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
       to: email,
       subject: 'Booking Request Update',
       html: `

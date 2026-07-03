@@ -109,7 +109,7 @@ export default async function handler(req, res) {
         const baseUrl = process.env.BASE_URL || 'https://hairbydekyi.vercel.app';
 
         await resend.emails.send({
-          from: 'Hair by Dekyi <onboarding@resend.dev>',
+          from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
           to: email,
           subject: 'Your time slot was not reserved',
           html: `

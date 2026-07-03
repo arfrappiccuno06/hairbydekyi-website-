@@ -193,19 +193,19 @@ export default async function handler(req, res) {
 
         // Send confirmation email to client
         await resend.emails.send({
-          from: 'Hair by Dekyi <onboarding@resend.dev>',
+          from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
           to: email,
-          subject: 'Appointment confirmed! See you soon 💇‍♀️',
+          subject: 'Appointment confirmed! See you soon',
           html: `
             <h2>Appointment Confirmed!</h2>
             <p>Hi ${name},</p>
             <p>Your deposit has been received and your appointment is now confirmed!</p>
 
             <h3>Appointment Details:</h3>
-            <p><strong>📅 Date & Time:</strong> ${selectedSlot}</p>
-            <p><strong>📍 Location:</strong> 3073 Parkerhill Rd, Mississauga, ON L5B 1V6</p>
-            <p><strong>💵 Service:</strong> At Home Cut n Style ($45)</p>
-            <p><strong>✅ Deposit:</strong> $5 received</p>
+            <p><strong>Date & Time:</strong> ${selectedSlot}</p>
+            <p><strong>Location:</strong> 3073 Parkerhill Rd, Mississauga, ON L5B 1V6</p>
+            <p><strong>Service:</strong> At Home Cut n Style ($45)</p>
+            <p><strong>Deposit:</strong> $5 received</p>
 
             <p>We look forward to seeing you!</p>
 
