@@ -11,6 +11,7 @@ const MenuPanel = ({ isOpen, onClose }) => {
       <div className={`menu-panel ${isOpen ? 'menu-panel-open' : ''}`}>
         <nav className="menu-nav">
           <Link to="/" className="menu-link" onClick={onClose}>Book</Link>
+          <Link to="/faq" className="menu-link" onClick={onClose}>FAQ</Link>
           <Link to="/about" className="menu-link" onClick={onClose}>About</Link>
           <Link to="/pricing" className="menu-link" onClick={onClose}>Pricing</Link>
           <Link to="/contact" className="menu-link" onClick={onClose}>Contact Me</Link>

@@ -203,6 +203,7 @@ export default async function handler(req, res) {
 
             <h3>Appointment Details:</h3>
             <p><strong>📅 Date & Time:</strong> ${selectedSlot}</p>
+            <p><strong>📍 Location:</strong> 3073 Parkerhill Rd, Mississauga, ON L5B 1V6</p>
             <p><strong>💵 Service:</strong> At Home Cut n Style ($45)</p>
             <p><strong>✅ Deposit:</strong> $5 received</p>
 
