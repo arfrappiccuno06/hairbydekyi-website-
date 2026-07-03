@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { fetchSchedule, getSlotConfigForDate } from '../utils/schedule.js';
 
 // Cache for calendar data (5 minutes)
 let cache = {
@@ -41,11 +42,17 @@ export default async function handler(req, res) {
 
     const auth = new google.auth.GoogleAuth({
       credentials,
-      scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
+      scopes: [
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/spreadsheets.readonly'
+      ],
     });
 
     const calendar = google.calendar({ version: 'v3', auth });
     const calendarId = process.env.GOOGLE_CALENDAR_ID;
+
+    // Fetch schedule configuration from Google Sheets
+    const schedule = await fetchSchedule(auth);
 
     // Get start and end of month
     const startOfMonth = new Date(year, month - 1, 1);
@@ -90,13 +97,15 @@ export default async function handler(req, res) {
     const todayString = `${torontoYear}-${torontoMonth}-${torontoDay}`;
 
     while (currentDate <= endOfMonth) {
-      const dayOfWeek = currentDate.getDay();
       const dateString = currentDate.toISOString().split('T')[0];
 
-      // Skip weekends (0 = Sunday, 6 = Saturday)
       // Skip dates in the past (before today)
-      if (dayOfWeek !== 0 && dayOfWeek !== 6 && dateString >= todayString) {
-        availability[dateString] = generateDailySlots(currentDate, events, dateString === todayString, torontoHour, torontoMinute);
+      if (dateString >= todayString) {
+        const slots = generateDailySlots(currentDate, events, nowInToronto, dateString === todayString, schedule);
+        // Only add to availability if there are slots configured for this day
+        if (slots && slots.length > 0) {
+          availability[dateString] = slots;
+        }
       }
 
       currentDate.setDate(currentDate.getDate() + 1);
@@ -122,26 +131,23 @@ export default async function handler(req, res) {
   }
 }
 
-// Generate time slots for a given day (9 AM - 6 PM, 1.5 hour slots)
-function generateDailySlots(date, busyEvents, isToday, currentTorontoHour, currentTorontoMinute) {
+// Generate time slots for a given day based on Schedule sheet
+function generateDailySlots(date, busyEvents, nowInToronto, isToday, schedule) {
   const slots = [];
   const dateString = date.toISOString().split('T')[0];
 
-  // Define slot times (9 AM, 10:30 AM, 12 PM, 1:30 PM, 3 PM, 4:30 PM)
-  const slotTimes = [
-    { hour: 9, minute: 0, label: '09:00 AM' },
-    { hour: 10, minute: 30, label: '10:30 AM' },
-    { hour: 12, minute: 0, label: '12:00 PM' },
-    { hour: 13, minute: 30, label: '01:30 PM' },
-    { hour: 15, minute: 0, label: '03:00 PM' },
-    { hour: 16, minute: 30, label: '04:30 PM' },
-  ];
+  // Get slot configuration for this specific date or fall back to default for day of week
+  const daySlots = getSlotConfigForDate(dateString, schedule);
 
-  for (const slot of slotTimes) {
+  if (!daySlots || daySlots.length === 0) {
+    // No slots configured for this day
+    return [];
+  }
+
+  for (const slot of daySlots) {
     // Create slot time in America/Toronto timezone
-    // Format: 2026-06-16T09:00:00-04:00 (EDT) or -05:00 (EST)
-    const slotStart = createTorontoDate(dateString, slot.hour, slot.minute);
-    const slotEnd = new Date(slotStart.getTime() + 90 * 60 * 1000); // Add 90 minutes
+    const slotStart = createTorontoDate(dateString, slot.startHour, slot.startMinute);
+    const slotEnd = createTorontoDate(dateString, slot.endHour, slot.endMinute);
 
     // Skip past time slots for today
     // Compare hours and minutes directly in Toronto timezone
@@ -189,3 +195,4 @@ function createTorontoDate(dateString, hour, minute) {
   const isoString = `${dateString}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00${offset}`;
   return new Date(isoString);
 }
+

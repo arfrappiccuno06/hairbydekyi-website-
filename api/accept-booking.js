@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { Resend } from 'resend';
+import { fetchSchedule, findSlotByTime } from '../utils/schedule.js';
 import { generateToken } from '../utils/tokens.js';
 
 export default async function handler(req, res) {
@@ -46,6 +47,9 @@ export default async function handler(req, res) {
     const sheets = google.sheets({ version: 'v4', auth });
     const calendar = google.calendar({ version: 'v3', auth });
     const spreadsheetId = '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
+
+    // Fetch schedule configuration for dynamic slot durations
+    const schedule = await fetchSchedule(auth);
 
     // Read all rows to find the matching token
     const response = await sheets.spreadsheets.values.get({
@@ -130,7 +134,7 @@ export default async function handler(req, res) {
 
     // Parse slot string to extract date and time
     // Expected format: "Monday, June 16 at 09:00 AM" or similar
-    const slotParsed = parseSlotString(selectedSlot);
+    const slotParsed = parseSlotString(selectedSlot, schedule);
     if (!slotParsed) {
       return res.status(400).send(`
         <html>
@@ -334,9 +338,9 @@ export default async function handler(req, res) {
 
 /**
  * Parse slot string like "Monday, June 16 at 09:00 AM" into ISO datetime
- * Returns { startDateTime: ISO string, endDateTime: ISO string (90 min later) }
+ * Returns { startDateTime: ISO string, endDateTime: ISO string (from Schedule) }
  */
-function parseSlotString(slotString) {
+function parseSlotString(slotString, schedule) {
   try {
     // Extract date and time parts
     // Expected format: "Monday, June 16 at 09:00 AM"
@@ -359,8 +363,25 @@ function parseSlotString(slotString) {
       return null;
     }
 
-    // Create end time (90 minutes later)
-    const endDate = new Date(startDate.getTime() + 90 * 60 * 1000);
+    // Get date in YYYY-MM-DD format
+    const dateString = startDate.toISOString().split('T')[0];
+
+    // Look up slot configuration from Schedule to get actual end time
+    const slotConfig = findSlotByTime(dateString, timeStr, schedule);
+
+    if (!slotConfig) {
+      console.warn(`Slot not found in schedule for ${dateString} at ${timeStr}, using 90min default`);
+      // Fallback to 90 minutes if slot not found in schedule
+      const endDate = new Date(startDate.getTime() + 90 * 60 * 1000);
+      return {
+        startDateTime: startDate.toISOString(),
+        endDateTime: endDate.toISOString(),
+      };
+    }
+
+    // Create end date using the configured end time from Schedule
+    const endDate = new Date(startDate);
+    endDate.setHours(slotConfig.endHour, slotConfig.endMinute, 0, 0);
 
     return {
       startDateTime: startDate.toISOString(),

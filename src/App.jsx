@@ -5,6 +5,7 @@ import './App.css';
 import Header from './components/Header';
 import MenuPanel from './components/MenuPanel';
 import Footer from './components/Footer';
+import Admin from './pages/Admin';
 import BookingPage from './pages/BookingPage';
 import About from './pages/About';
 import Pricing from './pages/Pricing';
@@ -34,6 +35,7 @@ function App() {
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/faq" element={<FAQ />} />
+          <Route path="/admin" element={<Admin />} />
         </Routes>
 
         <Footer />
