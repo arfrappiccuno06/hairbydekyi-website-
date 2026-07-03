@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import './App.css';
 import Header from './components/Header';
 import Calendar from './components/Calendar';
 import TimeSlotPicker from './components/TimeSlotPicker';
 import SelectionSummary from './components/SelectionSummary';
 import Footer from './components/Footer';
+import Admin from './pages/Admin';
 import { fetchAvailability } from './utils/api';
 
-function App() {
+function BookingPage() {
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedSlots, setSelectedSlots] = useState([]);
   const [showMenu, setShowMenu] = useState(false);
@@ -142,6 +144,17 @@ function App() {
 
       <Footer />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<BookingPage />} />
+        <Route path="/admin" element={<Admin />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
