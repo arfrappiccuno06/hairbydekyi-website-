@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
+import Calendar from '../components/Calendar';
 import '../styles/Admin.css';
+
+const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -7,16 +11,43 @@ function Admin() {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
 
-  const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' or 'bookings'
+  const [activeTab, setActiveTab] = useState('schedule');
   const [schedule, setSchedule] = useState({});
   const [bookings, setBookings] = useState([]);
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState(null);
   const [editingSlots, setEditingSlots] = useState([]);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [availabilityMap, setAvailabilityMap] = useState({});
 
   // Check authentication on mount
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Load schedule when authenticated
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'schedule') {
+      fetchSchedule();
+    }
+  }, [isAuthenticated, activeTab]);
+
+  // Load bookings when switching to bookings tab
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'bookings') {
+      fetchBookings();
+    }
+  }, [isAuthenticated, activeTab]);
+
+  // Convert schedule to availability map for calendar
+  useEffect(() => {
+    const availMap = {};
+    Object.keys(schedule).forEach(date => {
+      if (schedule[date] && schedule[date].length > 0) {
+        availMap[date] = ['configured']; // Just needs to be non-empty for calendar to show as available
+      }
+    });
+    setAvailabilityMap(availMap);
+  }, [schedule]);
 
   const checkAuth = async () => {
     try {
@@ -48,8 +79,6 @@ function Admin() {
       if (response.ok) {
         setIsAuthenticated(true);
         setPassword('');
-        fetchSchedule();
-        fetchBookings();
       } else {
         setLoginError('Invalid password');
       }
@@ -97,9 +126,17 @@ function Admin() {
 
   const handleDateSelect = (date) => {
     setSelectedDate(date);
-    // Load existing slots for this date or default template
+    // Load existing slots for this date or empty array
     const existingSlots = schedule[date] || [];
     setEditingSlots(existingSlots.map(s => ({ startTime: s.startTime, endTime: s.endTime })));
+
+    // Scroll to slot editor on mobile
+    setTimeout(() => {
+      const editor = document.querySelector('.admin-slot-editor');
+      if (editor) {
+        editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 100);
   };
 
   const addSlot = () => {
@@ -178,11 +215,23 @@ function Admin() {
     }
   };
 
+  // Format date for display
+  const formatDateDisplay = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString + 'T00:00:00');
+    const dayName = DAYS_OF_WEEK[date.getDay()];
+    const monthName = MONTHS[date.getMonth()];
+    const dayNum = date.getDate();
+    return `${dayName}, ${monthName} ${dayNum}`;
+  };
+
   // Loading state
   if (isLoading) {
     return (
-      <div className="admin-loading">
-        <p>Loading...</p>
+      <div className="app admin-app">
+        <div className="admin-loading">
+          <p>Loading...</p>
+        </div>
       </div>
     );
   }
@@ -190,23 +239,25 @@ function Admin() {
   // Login form
   if (!isAuthenticated) {
     return (
-      <div className="admin-login-container">
-        <div className="admin-login-box">
-          <h1>Admin Login</h1>
-          <form onSubmit={handleLogin}>
-            <input
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="admin-password-input"
-              autoFocus
-            />
-            {loginError && <p className="admin-error">{loginError}</p>}
-            <button type="submit" className="admin-login-button">
-              Login
-            </button>
-          </form>
+      <div className="app admin-app">
+        <div className="admin-login-container">
+          <div className="admin-login-box">
+            <h1>Admin Login</h1>
+            <form onSubmit={handleLogin}>
+              <input
+                type="password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="admin-password-input"
+                autoFocus
+              />
+              {loginError && <p className="admin-error">{loginError}</p>}
+              <button type="submit" className="admin-login-button">
+                Login
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     );
@@ -214,149 +265,156 @@ function Admin() {
 
   // Admin Dashboard
   return (
-    <div className="admin-container">
-      <header className="admin-header">
-        <h1>Admin Dashboard</h1>
-        <button onClick={handleLogout} className="admin-logout-button">
-          Logout
-        </button>
-      </header>
+    <div className="app admin-app">
+      <main className="main-content admin-content">
+        <div className="admin-header-section">
+          <h1 className="admin-title">Admin Dashboard</h1>
+          <button onClick={handleLogout} className="admin-logout-button">
+            Logout
+          </button>
+        </div>
 
-      <div className="admin-tabs">
-        <button
-          className={`admin-tab ${activeTab === 'schedule' ? 'active' : ''}`}
-          onClick={() => setActiveTab('schedule')}
-        >
-          Manage Schedule
-        </button>
-        <button
-          className={`admin-tab ${activeTab === 'bookings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('bookings')}
-        >
-          View Bookings
-        </button>
-      </div>
-
-      {activeTab === 'schedule' && (
-        <div className="admin-schedule-section">
-          <h2>Schedule Manager</h2>
-
-          <div className="admin-date-input">
-            <label>
-              Select Date (or DEFAULT_MONDAY, DEFAULT_SUNDAY, etc.):
-              <input
-                type="text"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                placeholder="YYYY-MM-DD or DEFAULT_MONDAY"
-                className="admin-input"
-              />
-            </label>
-            <button onClick={() => handleDateSelect(selectedDate)} className="admin-button">
-              Load Date
+        <div className="admin-container">
+          <div className="admin-tabs">
+            <button
+              className={`admin-tab ${activeTab === 'schedule' ? 'active' : ''}`}
+              onClick={() => setActiveTab('schedule')}
+            >
+              Manage Schedule
+            </button>
+            <button
+              className={`admin-tab ${activeTab === 'bookings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('bookings')}
+            >
+              View Bookings
             </button>
           </div>
 
-          {selectedDate && (
-            <div className="admin-slots-editor">
-              <h3>Editing: {selectedDate}</h3>
+          {activeTab === 'schedule' && (
+            <div className="admin-schedule-section">
+              <Calendar
+                selectedDate={selectedDate}
+                onDateSelect={handleDateSelect}
+                selectedSlots={[]}
+                availability={availabilityMap}
+                loading={false}
+                error={null}
+                currentMonth={currentMonth}
+                onMonthChange={setCurrentMonth}
+              />
 
-              {editingSlots.map((slot, index) => (
-                <div key={index} className="admin-slot-row">
-                  <input
-                    type="time"
-                    value={slot.startTime}
-                    onChange={(e) => updateSlot(index, 'startTime', e.target.value)}
-                    className="admin-time-input"
-                  />
-                  <span>to</span>
-                  <input
-                    type="time"
-                    value={slot.endTime}
-                    onChange={(e) => updateSlot(index, 'endTime', e.target.value)}
-                    className="admin-time-input"
-                  />
-                  <button
-                    onClick={() => removeSlot(index)}
-                    className="admin-remove-button"
-                  >
-                    Remove
-                  </button>
+              {selectedDate && (
+                <div className="admin-slot-editor">
+                  <h2 className="editor-title">Edit Time Slots</h2>
+                  <p className="editor-date">{formatDateDisplay(selectedDate)}</p>
+
+                  <div className="slots-list">
+                    {editingSlots.length === 0 && (
+                      <p className="no-slots-message">No time slots configured for this date. Add some below!</p>
+                    )}
+                    {editingSlots.map((slot, index) => (
+                      <div key={index} className="slot-row">
+                        <div className="slot-inputs">
+                          <input
+                            type="time"
+                            value={slot.startTime}
+                            onChange={(e) => updateSlot(index, 'startTime', e.target.value)}
+                            className="time-input"
+                          />
+                          <span className="time-separator">to</span>
+                          <input
+                            type="time"
+                            value={slot.endTime}
+                            onChange={(e) => updateSlot(index, 'endTime', e.target.value)}
+                            className="time-input"
+                          />
+                        </div>
+                        <button
+                          onClick={() => removeSlot(index)}
+                          className="remove-slot-button"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="editor-actions">
+                    <button onClick={addSlot} className="add-slot-button">
+                      + Add Time Slot
+                    </button>
+                    <button onClick={saveSchedule} className="save-button">
+                      Save Schedule
+                    </button>
+                  </div>
                 </div>
-              ))}
+              )}
+            </div>
+          )}
 
-              <div className="admin-actions">
-                <button onClick={addSlot} className="admin-button">
-                  Add Slot
+          {activeTab === 'bookings' && (
+            <div className="admin-bookings-section">
+              <div className="bookings-header">
+                <h2 className="bookings-title">All Bookings</h2>
+                <button onClick={fetchBookings} className="refresh-button">
+                  Refresh
                 </button>
-                <button onClick={saveSchedule} className="admin-save-button">
-                  Save Schedule
-                </button>
+              </div>
+
+              <div className="bookings-list">
+                {bookings.length === 0 && <p className="no-bookings">No bookings found</p>}
+                {bookings.map((booking, index) => (
+                  <div key={index} className={`booking-card status-${booking.status.toLowerCase()}`}>
+                    <div className="booking-header">
+                      <h3 className="booking-name">{booking.name}</h3>
+                      <span className={`booking-status status-${booking.status.toLowerCase()}`}>
+                        {booking.status || 'Pending'}
+                      </span>
+                    </div>
+
+                    <div className="booking-details">
+                      <p><strong>Email:</strong> {booking.email}</p>
+                      <p><strong>Phone:</strong> {booking.phone}</p>
+                      <p><strong>Submitted:</strong> {booking.timestamp}</p>
+
+                      <div className="booking-slots">
+                        <p><strong>Slot Options:</strong></p>
+                        <ul>
+                          {booking.slot1 && <li>{booking.slot1}</li>}
+                          {booking.slot2 && <li>{booking.slot2}</li>}
+                          {booking.slot3 && <li>{booking.slot3}</li>}
+                        </ul>
+                      </div>
+
+                      {booking.acceptedSlot && (
+                        <p className="accepted-slot"><strong>Accepted Slot:</strong> {booking.acceptedSlot}</p>
+                      )}
+
+                      {booking.depositScreenshot && (
+                        <p>
+                          <strong>Deposit:</strong>{' '}
+                          <a href={booking.depositScreenshot} target="_blank" rel="noopener noreferrer" className="deposit-link">
+                            View Screenshot
+                          </a>
+                        </p>
+                      )}
+                    </div>
+
+                    {booking.status === 'Accepted' && (
+                      <button
+                        onClick={() => cancelBooking(booking)}
+                        className="cancel-booking-button"
+                      >
+                        Cancel Appointment
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
         </div>
-      )}
-
-      {activeTab === 'bookings' && (
-        <div className="admin-bookings-section">
-          <h2>All Bookings</h2>
-          <button onClick={fetchBookings} className="admin-refresh-button">
-            Refresh
-          </button>
-
-          <div className="admin-bookings-list">
-            {bookings.length === 0 && <p>No bookings found</p>}
-            {bookings.map((booking, index) => (
-              <div key={index} className={`admin-booking-card status-${booking.status.toLowerCase()}`}>
-                <div className="booking-header">
-                  <h3>{booking.name}</h3>
-                  <span className={`booking-status status-${booking.status.toLowerCase()}`}>
-                    {booking.status || 'Pending'}
-                  </span>
-                </div>
-
-                <div className="booking-details">
-                  <p><strong>Email:</strong> {booking.email}</p>
-                  <p><strong>Phone:</strong> {booking.phone}</p>
-                  <p><strong>Submitted:</strong> {booking.timestamp}</p>
-
-                  <div className="booking-slots">
-                    <p><strong>Slot Options:</strong></p>
-                    <ul>
-                      {booking.slot1 && <li>{booking.slot1}</li>}
-                      {booking.slot2 && <li>{booking.slot2}</li>}
-                      {booking.slot3 && <li>{booking.slot3}</li>}
-                    </ul>
-                  </div>
-
-                  {booking.acceptedSlot && (
-                    <p><strong>Accepted Slot:</strong> {booking.acceptedSlot}</p>
-                  )}
-
-                  {booking.depositScreenshot && (
-                    <p>
-                      <strong>Deposit:</strong>{' '}
-                      <a href={booking.depositScreenshot} target="_blank" rel="noopener noreferrer">
-                        View Screenshot
-                      </a>
-                    </p>
-                  )}
-                </div>
-
-                {booking.status === 'Accepted' && (
-                  <button
-                    onClick={() => cancelBooking(booking)}
-                    className="admin-cancel-button"
-                  >
-                    Cancel Appointment
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </main>
     </div>
   );
 }
