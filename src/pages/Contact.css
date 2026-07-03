@@ -4,6 +4,8 @@
   align-items: center;
   justify-content: center;
   padding: 2rem 1.25rem;
+  position: relative;
+  z-index: 1;
 }
 
 .contact-content {

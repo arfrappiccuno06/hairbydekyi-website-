@@ -8,6 +8,7 @@ import BookingPage from './pages/BookingPage';
 import About from './pages/About';
 import Pricing from './pages/Pricing';
 import Contact from './pages/Contact';
+import FAQ from './pages/FAQ';
 
 function App() {
   const [showMenu, setShowMenu] = useState(false);
@@ -31,6 +32,7 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/faq" element={<FAQ />} />
         </Routes>
 
         <Footer />
