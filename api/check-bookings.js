@@ -108,7 +108,7 @@ export default async function handler(req, res) {
       try {
         // Send email via Resend
         await resend.emails.send({
-          from: 'Hair by Dekyi <onboarding@resend.dev>', // Will be from Resend's domain
+          from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
           to: 'hairbydekyi@gmail.com',
           subject: `New Booking Request from ${name}`,
           html: emailHtml,
