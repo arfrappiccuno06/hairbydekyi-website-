@@ -20,7 +20,7 @@ function Admin() {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('/api/admin/verify', {
+      const response = await fetch('/api/admin/auth?action=verify', {
         credentials: 'include',
       });
       const data = await response.json();
@@ -38,7 +38,7 @@ function Admin() {
     setLoginError('');
 
     try {
-      const response = await fetch('/api/admin/login', {
+      const response = await fetch('/api/admin/auth?action=login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -61,7 +61,7 @@ function Admin() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/admin/logout', {
+      await fetch('/api/admin/auth?action=logout', {
         method: 'POST',
         credentials: 'include',
       });
@@ -73,7 +73,7 @@ function Admin() {
 
   const fetchSchedule = async () => {
     try {
-      const response = await fetch('/api/admin/get-schedule', {
+      const response = await fetch('/api/admin/operations?action=get-schedule', {
         credentials: 'include',
       });
       const data = await response.json();
@@ -85,7 +85,7 @@ function Admin() {
 
   const fetchBookings = async () => {
     try {
-      const response = await fetch('/api/admin/get-bookings', {
+      const response = await fetch('/api/admin/operations?action=get-bookings', {
         credentials: 'include',
       });
       const data = await response.json();
@@ -126,7 +126,7 @@ function Admin() {
     const validSlots = editingSlots.filter(s => s.startTime && s.endTime);
 
     try {
-      const response = await fetch('/api/admin/update-schedule', {
+      const response = await fetch('/api/admin/operations?action=update-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -154,7 +154,7 @@ function Admin() {
     }
 
     try {
-      const response = await fetch('/api/admin/cancel-booking', {
+      const response = await fetch('/api/admin/operations?action=cancel-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
