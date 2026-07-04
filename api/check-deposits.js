@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { Resend } from 'resend';
+import { fetchSchedule, findSlotByTime } from '../utils/schedule.js';
 
 export default async function handler(req, res) {
   try {
@@ -20,6 +21,9 @@ export default async function handler(req, res) {
     const sheets = google.sheets({ version: 'v4', auth });
     const calendar = google.calendar({ version: 'v3', auth });
     const spreadsheetId = '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
+
+    // Fetch schedule for slot duration lookup
+    const schedule = await fetchSchedule(auth);
 
     // Read Deposits Form tab (A=Timestamp, B=Screenshot, C=Token, D=Email)
     const depositsResponse = await sheets.spreadsheets.values.get({
@@ -115,7 +119,7 @@ export default async function handler(req, res) {
       const slotNumber = parseInt(acceptedSlot.replace('Slot ', '')) - 1;
       const selectedSlot = slots[slotNumber];
 
-      const slotParsed = parseSlotString(selectedSlot);
+      const slotParsed = parseSlotString(selectedSlot, schedule);
       if (!slotParsed) {
         console.error(`Could not parse slot: ${selectedSlot}`);
         continue;
@@ -246,35 +250,101 @@ export default async function handler(req, res) {
 
 /**
  * Parse slot string like "Monday, June 16 at 09:00 AM" into ISO datetime
+ * Returns { startDateTime: ISO string, endDateTime: ISO string (from Schedule) }
  */
-function parseSlotString(slotString) {
+function parseSlotString(slotString, schedule) {
   try {
+    // Extract date and time parts
+    // Expected format: "Monday, June 16 at 09:00 AM"
     const match = slotString.match(/(\w+,\s+\w+\s+\d+)\s+at\s+(\d+:\d+\s+[AP]M)/i);
 
     if (!match) {
       return null;
     }
 
-    const dateStr = match[1];
-    const timeStr = match[2];
+    const dateStr = match[1]; // "Monday, June 16"
+    const timeStr = match[2]; // "09:00 AM"
 
+    // Parse date to get YYYY-MM-DD format (but NOT as a Date object yet)
     const currentYear = new Date().getFullYear();
-    const fullDateStr = `${dateStr}, ${currentYear} ${timeStr}`;
+    const tempFullDateStr = `${dateStr}, ${currentYear}`;
+    const tempDate = new Date(tempFullDateStr);
 
-    const startDate = new Date(fullDateStr);
-
-    if (isNaN(startDate.getTime())) {
+    if (isNaN(tempDate.getTime())) {
       return null;
     }
 
-    const endDate = new Date(startDate.getTime() + 90 * 60 * 1000);
+    // Get date in YYYY-MM-DD format
+    const year = tempDate.getFullYear();
+    const month = String(tempDate.getMonth() + 1).padStart(2, '0');
+    const day = String(tempDate.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+
+    // Parse time string to get hour and minute
+    const timeMatch = timeStr.match(/(\d+):(\d+)\s+([AP]M)/i);
+    if (!timeMatch) {
+      return null;
+    }
+
+    let hour = parseInt(timeMatch[1], 10);
+    const minute = parseInt(timeMatch[2], 10);
+    const period = timeMatch[3].toUpperCase();
+
+    // Convert to 24-hour format
+    if (period === 'PM' && hour !== 12) {
+      hour += 12;
+    } else if (period === 'AM' && hour === 12) {
+      hour = 0;
+    }
+
+    // Look up slot configuration from Schedule to get actual end time
+    const slotConfig = findSlotByTime(dateString, timeStr, schedule);
+
+    if (!slotConfig) {
+      console.warn(`Slot not found in schedule for ${dateString} at ${timeStr}, using 90min default`);
+      // Fallback to 90 minutes if slot not found in schedule
+      const startDateTime = createTorontoDateTime(dateString, hour, minute);
+      const endDateTime = createTorontoDateTime(dateString, hour, minute + 90);
+      return {
+        startDateTime,
+        endDateTime,
+      };
+    }
+
+    // Create start and end datetimes in Toronto timezone
+    const startDateTime = createTorontoDateTime(dateString, hour, minute);
+    const endDateTime = createTorontoDateTime(dateString, slotConfig.endHour, slotConfig.endMinute);
 
     return {
-      startDateTime: startDate.toISOString(),
-      endDateTime: endDate.toISOString(),
+      startDateTime,
+      endDateTime,
     };
   } catch (error) {
     console.error('Error parsing slot string:', error);
     return null;
   }
+}
+
+/**
+ * Create an ISO datetime string in America/Toronto timezone
+ * @param {string} dateString - Date in YYYY-MM-DD format
+ * @param {number} hour - Hour (0-23)
+ * @param {number} minute - Minute (0-59)
+ * @returns {string} ISO datetime string with Toronto timezone offset
+ */
+function createTorontoDateTime(dateString, hour, minute) {
+  const [year, month] = dateString.split('-').map(Number);
+
+  // Simple DST check: March-October use EDT (-04:00), Nov-Feb use EST (-05:00)
+  const isDST = month >= 3 && month <= 10;
+  const offset = isDST ? '-04:00' : '-05:00';
+
+  // Handle minute overflow (e.g., minute = 150 = 2 hours 30 minutes)
+  const totalMinutes = hour * 60 + minute;
+  const finalHour = Math.floor(totalMinutes / 60) % 24;
+  const finalMinute = totalMinutes % 60;
+
+  // Create ISO string with Toronto timezone offset
+  const isoString = `${dateString}T${String(finalHour).padStart(2, '0')}:${String(finalMinute).padStart(2, '0')}:00${offset}`;
+  return isoString;
 }

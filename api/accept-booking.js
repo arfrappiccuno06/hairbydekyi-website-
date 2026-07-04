@@ -353,18 +353,37 @@ function parseSlotString(slotString, schedule) {
     const dateStr = match[1]; // "Monday, June 16"
     const timeStr = match[2]; // "09:00 AM"
 
-    // Parse date (assuming current year)
+    // Parse date to get YYYY-MM-DD format (but NOT as a Date object yet)
     const currentYear = new Date().getFullYear();
-    const fullDateStr = `${dateStr}, ${currentYear} ${timeStr}`;
+    const tempFullDateStr = `${dateStr}, ${currentYear}`;
+    const tempDate = new Date(tempFullDateStr);
 
-    const startDate = new Date(fullDateStr);
-
-    if (isNaN(startDate.getTime())) {
+    if (isNaN(tempDate.getTime())) {
       return null;
     }
 
     // Get date in YYYY-MM-DD format
-    const dateString = startDate.toISOString().split('T')[0];
+    const year = tempDate.getFullYear();
+    const month = String(tempDate.getMonth() + 1).padStart(2, '0');
+    const day = String(tempDate.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+
+    // Parse time string to get hour and minute
+    const timeMatch = timeStr.match(/(\d+):(\d+)\s+([AP]M)/i);
+    if (!timeMatch) {
+      return null;
+    }
+
+    let hour = parseInt(timeMatch[1], 10);
+    const minute = parseInt(timeMatch[2], 10);
+    const period = timeMatch[3].toUpperCase();
+
+    // Convert to 24-hour format
+    if (period === 'PM' && hour !== 12) {
+      hour += 12;
+    } else if (period === 'AM' && hour === 12) {
+      hour = 0;
+    }
 
     // Look up slot configuration from Schedule to get actual end time
     const slotConfig = findSlotByTime(dateString, timeStr, schedule);
@@ -372,23 +391,48 @@ function parseSlotString(slotString, schedule) {
     if (!slotConfig) {
       console.warn(`Slot not found in schedule for ${dateString} at ${timeStr}, using 90min default`);
       // Fallback to 90 minutes if slot not found in schedule
-      const endDate = new Date(startDate.getTime() + 90 * 60 * 1000);
+      const startDateTime = createTorontoDateTime(dateString, hour, minute);
+      const endDateTime = createTorontoDateTime(dateString, hour, minute + 90);
       return {
-        startDateTime: startDate.toISOString(),
-        endDateTime: endDate.toISOString(),
+        startDateTime,
+        endDateTime,
       };
     }
 
-    // Create end date using the configured end time from Schedule
-    const endDate = new Date(startDate);
-    endDate.setHours(slotConfig.endHour, slotConfig.endMinute, 0, 0);
+    // Create start and end datetimes in Toronto timezone
+    const startDateTime = createTorontoDateTime(dateString, hour, minute);
+    const endDateTime = createTorontoDateTime(dateString, slotConfig.endHour, slotConfig.endMinute);
 
     return {
-      startDateTime: startDate.toISOString(),
-      endDateTime: endDate.toISOString(),
+      startDateTime,
+      endDateTime,
     };
   } catch (error) {
     console.error('Error parsing slot string:', error);
     return null;
   }
+}
+
+/**
+ * Create an ISO datetime string in America/Toronto timezone
+ * @param {string} dateString - Date in YYYY-MM-DD format
+ * @param {number} hour - Hour (0-23)
+ * @param {number} minute - Minute (0-59)
+ * @returns {string} ISO datetime string with Toronto timezone offset
+ */
+function createTorontoDateTime(dateString, hour, minute) {
+  const [year, month] = dateString.split('-').map(Number);
+
+  // Simple DST check: March-October use EDT (-04:00), Nov-Feb use EST (-05:00)
+  const isDST = month >= 3 && month <= 10;
+  const offset = isDST ? '-04:00' : '-05:00';
+
+  // Handle minute overflow (e.g., minute = 150 = 2 hours 30 minutes)
+  const totalMinutes = hour * 60 + minute;
+  const finalHour = Math.floor(totalMinutes / 60) % 24;
+  const finalMinute = totalMinutes % 60;
+
+  // Create ISO string with Toronto timezone offset
+  const isoString = `${dateString}T${String(finalHour).padStart(2, '0')}:${String(finalMinute).padStart(2, '0')}:00${offset}`;
+  return isoString;
 }
