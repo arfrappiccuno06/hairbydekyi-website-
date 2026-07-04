@@ -39,15 +39,27 @@ function Admin() {
   }, [isAuthenticated, activeTab]);
 
   // Convert schedule to availability map for calendar
+  // In admin mode, ALL dates should be clickable (not just ones with slots)
   useEffect(() => {
     const availMap = {};
-    Object.keys(schedule).forEach(date => {
-      if (schedule[date] && schedule[date].length > 0) {
-        availMap[date] = ['configured']; // Just needs to be non-empty for calendar to show as available
-      }
-    });
+
+    // Get current month's date range
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+
+    // Make all dates in the current month clickable
+    const currentDate = new Date(firstDay);
+    while (currentDate <= lastDay) {
+      const dateString = currentDate.toISOString().split('T')[0];
+      // Mark all dates as available (admin can configure any date)
+      availMap[dateString] = ['editable'];
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
     setAvailabilityMap(availMap);
-  }, [schedule]);
+  }, [schedule, currentMonth]);
 
   const checkAuth = async () => {
     try {
