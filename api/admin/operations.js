@@ -88,7 +88,22 @@ async function getSchedule(req, res) {
       const endTime = row[endColIndex];
 
       if (startTime && endTime) {
-        slots.push({ startTime, endTime });
+        // Parse "HH:MM" format into hour/minute components
+        const [startHour, startMinute] = startTime.split(':').map(Number);
+        const [endHour, endMinute] = endTime.split(':').map(Number);
+
+        // Create label in 12-hour format
+        const period = startHour >= 12 ? 'PM' : 'AM';
+        const hour12 = startHour === 0 ? 12 : startHour > 12 ? startHour - 12 : startHour;
+        const label = `${String(hour12).padStart(2, '0')}:${String(startMinute).padStart(2, '0')} ${period}`;
+
+        slots.push({
+          startHour,
+          startMinute,
+          endHour,
+          endMinute,
+          label,
+        });
       }
     }
 
