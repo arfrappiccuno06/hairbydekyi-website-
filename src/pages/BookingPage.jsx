@@ -56,8 +56,10 @@ const BookingPage = () => {
       // Remove slot
       setSelectedSlots(selectedSlots.filter((_, index) => index !== existingIndex));
     } else {
-      // Add slot
-      setSelectedSlots([...selectedSlots, { date, time }]);
+      // Only add slot if less than 3 are selected
+      if (selectedSlots.length < 3) {
+        setSelectedSlots([...selectedSlots, { date, time }]);
+      }
     }
   };
 
