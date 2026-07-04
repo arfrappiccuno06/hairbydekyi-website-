@@ -101,7 +101,7 @@ export default async function handler(req, res) {
 
       // Skip dates in the past (before today)
       if (dateString >= todayString) {
-        const slots = generateDailySlots(currentDate, events, nowInToronto, dateString === todayString, schedule);
+        const slots = generateDailySlots(currentDate, events, torontoHour, torontoMinute, dateString === todayString, schedule);
         // Only add to availability if there are slots configured for this day
         if (slots && slots.length > 0) {
           availability[dateString] = slots;
@@ -132,7 +132,7 @@ export default async function handler(req, res) {
 }
 
 // Generate time slots for a given day based on Schedule sheet
-function generateDailySlots(date, busyEvents, nowInToronto, isToday, schedule) {
+function generateDailySlots(date, busyEvents, currentTorontoHour, currentTorontoMinute, isToday, schedule) {
   const slots = [];
   const dateString = date.toISOString().split('T')[0];
 
@@ -153,7 +153,7 @@ function generateDailySlots(date, busyEvents, nowInToronto, isToday, schedule) {
     // Compare hours and minutes directly in Toronto timezone
     if (isToday) {
       const currentTimeInMinutes = currentTorontoHour * 60 + currentTorontoMinute;
-      const slotTimeInMinutes = slot.hour * 60 + slot.minute;
+      const slotTimeInMinutes = slot.startHour * 60 + slot.startMinute;
 
       if (slotTimeInMinutes <= currentTimeInMinutes) {
         continue; // Slot has passed
