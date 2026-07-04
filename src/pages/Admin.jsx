@@ -39,9 +39,23 @@ function Admin() {
   }, [isAuthenticated, activeTab]);
 
   // Convert schedule to availability map for calendar
-  // In admin mode, ALL dates should be clickable (not just ones with slots)
+  // In admin mode, ALL FUTURE dates should be clickable (not past dates)
   useEffect(() => {
     const availMap = {};
+
+    // Get current date in Toronto timezone
+    const nowUTC = new Date();
+    const torontoFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Toronto',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const torontoParts = torontoFormatter.formatToParts(nowUTC);
+    const torontoYear = torontoParts.find(p => p.type === 'year').value;
+    const torontoMonth = torontoParts.find(p => p.type === 'month').value;
+    const torontoDay = torontoParts.find(p => p.type === 'day').value;
+    const todayString = `${torontoYear}-${torontoMonth}-${torontoDay}`;
 
     // Get current month's date range
     const year = currentMonth.getFullYear();
@@ -49,12 +63,14 @@ function Admin() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
 
-    // Make all dates in the current month clickable
+    // Make all FUTURE dates in the current month clickable (no past dates)
     const currentDate = new Date(firstDay);
     while (currentDate <= lastDay) {
       const dateString = currentDate.toISOString().split('T')[0];
-      // Mark all dates as available (admin can configure any date)
-      availMap[dateString] = ['editable'];
+      // Only mark dates >= today as available
+      if (dateString >= todayString) {
+        availMap[dateString] = ['editable'];
+      }
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
@@ -138,9 +154,26 @@ function Admin() {
 
   const handleDateSelect = (date) => {
     setSelectedDate(date);
-    // Load existing slots for this date or empty array
-    const existingSlots = schedule[date] || [];
-    setEditingSlots(existingSlots.map(s => ({ startTime: s.startTime, endTime: s.endTime })));
+
+    // Load existing slots for this date, checking both specific date and default day
+    let existingSlots = schedule[date] || [];
+
+    // If no specific date config, check for default day template
+    if (existingSlots.length === 0) {
+      const dateObj = new Date(date + 'T00:00:00');
+      const dayOfWeek = dateObj.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+      const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+      const defaultKey = `DEFAULT_${dayNames[dayOfWeek]}`;
+      existingSlots = schedule[defaultKey] || [];
+    }
+
+    // Convert from {startHour, startMinute, endHour, endMinute} to {startTime: "HH:MM", endTime: "HH:MM"}
+    const formattedSlots = existingSlots.map(s => ({
+      startTime: `${String(s.startHour).padStart(2, '0')}:${String(s.startMinute).padStart(2, '0')}`,
+      endTime: `${String(s.endHour).padStart(2, '0')}:${String(s.endMinute).padStart(2, '0')}`
+    }));
+
+    setEditingSlots(formattedSlots);
 
     // Scroll to slot editor on mobile
     setTimeout(() => {
@@ -194,6 +227,41 @@ function Admin() {
     } catch (error) {
       console.error('Error saving schedule:', error);
       alert('Error saving schedule');
+    }
+  };
+
+  const resetToDefault = async () => {
+    if (!selectedDate) {
+      alert('Please select a date first');
+      return;
+    }
+
+    if (!confirm('Reset this date to use the default schedule for this day of the week?')) {
+      return;
+    }
+
+    try {
+      // Save with empty slots array to delete the specific date entry
+      const response = await fetch('/api/admin/operations?action=update-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          date: selectedDate,
+          slots: [], // Empty = delete row
+        }),
+      });
+
+      if (response.ok) {
+        alert('Reset to default successfully!');
+        fetchSchedule();
+        setSelectedDate(null); // Deselect date
+      } else {
+        alert('Failed to reset');
+      }
+    } catch (error) {
+      console.error('Error resetting schedule:', error);
+      alert('Error resetting schedule');
     }
   };
 
@@ -358,6 +426,11 @@ function Admin() {
                     <button onClick={saveSchedule} className="save-button">
                       Save Schedule
                     </button>
+                    {schedule[selectedDate] && schedule[selectedDate].length > 0 && (
+                      <button onClick={resetToDefault} className="reset-button">
+                        Reset to Default
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

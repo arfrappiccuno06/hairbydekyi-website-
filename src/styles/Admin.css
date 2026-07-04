@@ -337,6 +337,29 @@
   transform: translateY(0);
 }
 
+.reset-button {
+  padding: 12px 20px;
+  background-color: var(--text-primary);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: transform 0.2s, box-shadow 0.2s;
+  font-family: 'Montserrat', sans-serif;
+  min-height: 48px;
+}
+
+.reset-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(122, 106, 97, 0.3);
+}
+
+.reset-button:active {
+  transform: translateY(0);
+}
+
 /* Bookings Section */
 .admin-bookings-section {
   background: var(--bg-card);
@@ -592,11 +615,14 @@
   .editor-actions {
     flex-direction: row;
     gap: 1rem;
+    flex-wrap: wrap;
   }
 
   .add-slot-button,
-  .save-button {
+  .save-button,
+  .reset-button {
     flex: 1;
+    min-width: 150px;
   }
 
   .booking-header {
