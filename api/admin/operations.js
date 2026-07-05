@@ -227,10 +227,10 @@ async function getBookings(req, res) {
   const sheets = google.sheets({ version: 'v4', auth });
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
 
-  // Fetch all booking data from Form Responses sheet
+  // Fetch all booking data from Booking Form sheet
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Form Responses 1!A:P',
+    range: 'Booking Form!A:T',
   });
 
   const rows = response.data.values;
@@ -263,6 +263,10 @@ async function getBookings(req, res) {
       acceptedSlot: row[13] || '',
       calendarEventId: row[14] || '',
       processedTimestamp: row[15] || '',
+      depositToken: row[16] || '',
+      depositDeadline: row[17] || '',
+      depositReceivedTimestamp: row[18] || '',
+      depositScreenshotUrl: row[19] || '',
     };
 
     bookings.push(booking);
@@ -326,7 +330,7 @@ async function cancelBooking(req, res) {
   // Update the Google Sheet status to "Cancelled"
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `Form Responses 1!M${rowIndex}`, // Column M = Status
+    range: `Booking Form!M${rowIndex}`, // Column M = Status
     valueInputOption: 'RAW',
     requestBody: {
       values: [['Cancelled']],

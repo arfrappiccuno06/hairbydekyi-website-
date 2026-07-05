@@ -299,13 +299,17 @@ export default async function handler(req, res) {
         <p>To secure your appointment, please submit your $5 deposit within 24 hours:</p>
         <p><a href="${depositFormLink}" style="display: inline-block; padding: 12px 24px; background-color: #A8BDA8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Submit Deposit Screenshot</a></p>
 
+        <p style="font-size: 0.875rem; color: #7A6A61; margin-top: 8px;">
+          Button not working? <a href="${depositFormLink}" style="color: #8B6D7B; text-decoration: underline;">Click here to submit your deposit</a>
+        </p>
+
         <p><strong>Important:</strong> If we don't receive your deposit within 24 hours, this time slot will become available for others to book.</p>
 
         <p><strong>Deadline:</strong> ${depositDeadline.toLocaleString('en-US', { timeZone: 'America/Toronto', dateStyle: 'full', timeStyle: 'short' })}</p>
 
-        <p>Questions? Reply to this email or DM us @hairbydekyi on Instagram.</p>
-
-        <p>- Dekyi</p>
+        <p style="font-size: 0.875rem; color: #7A6A61; margin-top: 16px;">
+          If it's been more than 24 hours, you'll need to rebook at <a href="https://www.hairbydekyi.com" style="color: #8B6D7B; text-decoration: underline;">hairbydekyi.com</a>
+        </p>
       `,
     });
 
