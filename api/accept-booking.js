@@ -314,6 +314,10 @@ export default async function handler(req, res) {
     // Create pre-filled deposit form link
     const depositFormLink = `${depositFormUrl}?entry.${depositTokenEntryId}=${depositToken}`;
 
+    // Client-side cancellation link (same format as the confirmation email)
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5173';
+    const clientCancelLink = `${baseUrl}/api/admin/operations?action=client-cancel&token=${depositToken}`;
+
     // Update Sheet: Status=pending_deposit, AcceptedSlot, CalendarEventId (temp), ProcessedTimestamp (accept time), deposit_token, deposit_deadline
     const rowNumber = matchingRowIndex + 1;
 
@@ -389,6 +393,11 @@ export default async function handler(req, res) {
             <p style="color: #2c2c2c; line-height: 1.6; margin-top: 20px;"><strong>Important:</strong> If we don't receive your deposit within 24 hours, this time slot will become available for others to book.</p>
 
             <p style="color: #2c2c2c; line-height: 1.6;"><strong>Deadline:</strong> ${depositDeadline.toLocaleString('en-US', { timeZone: 'America/Toronto', dateStyle: 'full', timeStyle: 'short' })}</p>
+
+            <hr style="border: none; border-top: 1px solid #e0d8d2; margin: 28px 0;">
+
+            <p style="color: #2c2c2c; line-height: 1.6;">If the above time no longer works for you, please be kind to others and cancel using the button below, then rebook at <a href="https://www.hairbydekyi.com" style="color: #7a5566; text-decoration: underline;">hairbydekyi.com</a> with time slots that work for you.</p>
+            <p><a href="${clientCancelLink}" style="display: inline-block; padding: 12px 24px; background-color: #d9534f; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Cancel Appointment</a></p>
 
             <p style="font-size: 0.875rem; color: #666666; margin-top: 16px; line-height: 1.5;">
               If it's been more than 24 hours, you'll need to rebook at <a href="https://www.hairbydekyi.com" style="color: #7a5566; text-decoration: underline;">hairbydekyi.com</a>
