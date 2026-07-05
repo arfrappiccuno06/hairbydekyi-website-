@@ -459,17 +459,38 @@ function parseSlotString(slotString, schedule) {
 }
 
 /**
+ * Find the nth occurrence of a weekday in a month
+ * @param {number} year - Year
+ * @param {number} month - Month (1-12)
+ * @param {number} n - Which occurrence (1 = first, 2 = second, etc.)
+ * @param {number} weekday - Day of week (0 = Sunday, 6 = Saturday)
+ * @returns {Date} Date object for the nth weekday
+ */
+function getNthWeekday(year, month, n, weekday) {
+  const firstDay = new Date(year, month - 1, 1);
+  const firstWeekday = 1 + ((weekday - firstDay.getDay() + 7) % 7);
+  return new Date(year, month - 1, firstWeekday + (n - 1) * 7);
+}
+
+/**
  * Create an ISO datetime string in America/Toronto timezone
+ * Properly handles DST transitions (2nd Sunday in March, 1st Sunday in November)
  * @param {string} dateString - Date in YYYY-MM-DD format
  * @param {number} hour - Hour (0-23)
  * @param {number} minute - Minute (0-59)
  * @returns {string} ISO datetime string with Toronto timezone offset
  */
 function createTorontoDateTime(dateString, hour, minute) {
-  const [year, month] = dateString.split('-').map(Number);
+  const [year, month, day] = dateString.split('-').map(Number);
 
-  // Simple DST check: March-October use EDT (-04:00), Nov-Feb use EST (-05:00)
-  const isDST = month >= 3 && month <= 10;
+  // DST transitions in America/Toronto:
+  // Starts: 2nd Sunday in March at 2:00 AM → EDT (-04:00)
+  // Ends: 1st Sunday in November at 2:00 AM → EST (-05:00)
+  const dstStart = getNthWeekday(year, 3, 2, 0); // 2nd Sunday in March
+  const dstEnd = getNthWeekday(year, 11, 1, 0); // 1st Sunday in November
+
+  const currentDate = new Date(year, month - 1, day);
+  const isDST = currentDate >= dstStart && currentDate < dstEnd;
   const offset = isDST ? '-04:00' : '-05:00';
 
   // Handle minute overflow (e.g., minute = 150 = 2 hours 30 minutes)
