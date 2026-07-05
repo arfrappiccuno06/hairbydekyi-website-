@@ -284,34 +284,75 @@ export default async function handler(req, res) {
       },
     });
 
+    // Validate email address before sending
+    if (!email || email.trim() === '') {
+      console.error('Cannot send deposit email: Client email is empty or missing');
+      return res.status(500).send(`
+        <html>
+          <body>
+            <h1>Error: No Email Address</h1>
+            <p>The booking was accepted but the client's email address is missing.</p>
+            <p><strong>Client:</strong> ${name}</p>
+            <p>Please contact the client directly to request their deposit.</p>
+          </body>
+        </html>
+      `);
+    }
+
     // Send deposit request email to CLIENT
     const resend = new Resend(process.env.RESEND_API_KEY);
 
-    await resend.emails.send({
-      from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
-      to: email,
-      subject: 'Submit Your Deposit in 24 hrs - Appointment Approved',
-      html: `
-        <h2>Great news, ${name}!</h2>
-        <p>Your requested time slot for <strong>${selectedSlot}</strong> has been approved.</p>
+    try {
+      const emailResponse = await resend.emails.send({
+        from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+        to: email,
+        subject: 'Submit Your Deposit in 24 hrs - Appointment Approved',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #2c2c2c;">
+            <h2 style="color: #8a9d8a; margin-bottom: 20px;">Great news, ${name}!</h2>
+            <p style="color: #2c2c2c; line-height: 1.6;">Your requested time slot for <strong>${selectedSlot}</strong> has been approved.</p>
 
-        <h3>Next Step: Submit Your Deposit</h3>
-        <p>To secure your appointment, please submit your $5 deposit within 24 hours:</p>
-        <p><a href="${depositFormLink}" style="display: inline-block; padding: 12px 24px; background-color: #A8BDA8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Submit Deposit Screenshot</a></p>
+            <h3 style="color: #7a5566; margin-top: 25px; margin-bottom: 10px;">Next Step: Submit Your Deposit</h3>
+            <p style="color: #2c2c2c; line-height: 1.6;">To secure your appointment, please submit your $5 deposit within 24 hours:</p>
+            <p><a href="${depositFormLink}" style="display: inline-block; padding: 12px 24px; background-color: #8a9d8a; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Submit Deposit Screenshot</a></p>
 
-        <p style="font-size: 0.875rem; color: #7A6A61; margin-top: 8px;">
-          Button not working? <a href="${depositFormLink}" style="color: #8B6D7B; text-decoration: underline;">Click here to submit your deposit</a>
-        </p>
+            <p style="font-size: 0.875rem; color: #666666; margin-top: 8px; line-height: 1.5;">
+              Button not working? <a href="${depositFormLink}" style="color: #7a5566; text-decoration: underline;">Click here to submit your deposit</a>
+            </p>
 
-        <p><strong>Important:</strong> If we don't receive your deposit within 24 hours, this time slot will become available for others to book.</p>
+            <p style="color: #2c2c2c; line-height: 1.6; margin-top: 20px;"><strong>Important:</strong> If we don't receive your deposit within 24 hours, this time slot will become available for others to book.</p>
 
-        <p><strong>Deadline:</strong> ${depositDeadline.toLocaleString('en-US', { timeZone: 'America/Toronto', dateStyle: 'full', timeStyle: 'short' })}</p>
+            <p style="color: #2c2c2c; line-height: 1.6;"><strong>Deadline:</strong> ${depositDeadline.toLocaleString('en-US', { timeZone: 'America/Toronto', dateStyle: 'full', timeStyle: 'short' })}</p>
 
-        <p style="font-size: 0.875rem; color: #7A6A61; margin-top: 16px;">
-          If it's been more than 24 hours, you'll need to rebook at <a href="https://www.hairbydekyi.com" style="color: #8B6D7B; text-decoration: underline;">hairbydekyi.com</a>
-        </p>
-      `,
-    });
+            <p style="font-size: 0.875rem; color: #666666; margin-top: 16px; line-height: 1.5;">
+              If it's been more than 24 hours, you'll need to rebook at <a href="https://www.hairbydekyi.com" style="color: #7a5566; text-decoration: underline;">hairbydekyi.com</a>
+            </p>
+          </div>
+        `,
+      });
+
+      // Check if Resend returned an error
+      if (emailResponse.error) {
+        console.error('Resend API error when sending deposit email:', emailResponse.error);
+        throw new Error(`Resend API error: ${emailResponse.error.message}`);
+      }
+
+      console.log(`✓ Deposit email sent successfully to ${email}, message ID: ${emailResponse.data?.id}`);
+    } catch (emailError) {
+      console.error('Failed to send deposit email to client:', emailError);
+      return res.status(500).send(`
+        <html>
+          <body>
+            <h1>Email Send Failed</h1>
+            <p>The booking was accepted and the calendar hold was created, but we failed to send the deposit request email.</p>
+            <p><strong>Client:</strong> ${name}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Error:</strong> ${emailError.message}</p>
+            <p style="margin-top: 20px; color: #d9534f;"><strong>ACTION REQUIRED:</strong> Please contact the client directly to request their deposit. The calendar hold will expire in 24 hours if not received.</p>
+          </body>
+        </html>
+      `);
+    }
 
     // Return success page
     return res.status(200).send(`

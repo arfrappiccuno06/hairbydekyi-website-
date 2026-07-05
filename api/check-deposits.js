@@ -198,87 +198,129 @@ export default async function handler(req, res) {
         // Define base URL first (needed for both client and admin emails)
         const baseUrl = process.env.BASE_URL || 'https://www.hairbydekyi.com';
 
-        // Send confirmation email to client
-        const clientCancelLink = `${baseUrl}/api/admin/operations?action=client-cancel&token=${depositToken}`;
+        // Validate client email address
+        if (!email || email.trim() === '') {
+          console.error(`Cannot send confirmation email: Client email is empty for deposit token ${depositToken}`);
+          // Continue to admin email - don't skip admin notification
+        } else {
+          // Send confirmation email to client
+          const clientCancelLink = `${baseUrl}/api/admin/operations?action=client-cancel&token=${depositToken}`;
 
-        await resend.emails.send({
-          from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
-          to: email,
-          subject: 'Appointment confirmed! See you soon',
-          html: `
-            <h2>Appointment Confirmed!</h2>
-            <p>Hi ${name},</p>
-            <p>Your deposit has been received and your appointment is now confirmed!</p>
+          try {
+            const clientEmailResponse = await resend.emails.send({
+              from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+              to: email,
+              subject: 'Appointment confirmed! See you soon',
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #2c2c2c;">
+                  <h2 style="color: #8a9d8a; margin-bottom: 20px;">Appointment Confirmed!</h2>
+                  <p style="color: #2c2c2c; line-height: 1.6;">Hi ${name},</p>
+                  <p style="color: #2c2c2c; line-height: 1.6;">Your deposit has been received and your appointment is now confirmed!</p>
 
-            <h3>Appointment Details:</h3>
-            <p><strong>Date & Time:</strong> ${selectedSlot}</p>
-            <p><strong>Location:</strong> 3073 Parkerhill Rd, Mississauga, ON L5B 1V6</p>
-            <p><strong>Service:</strong> At Home Cut n Style ($45)</p>
-            <p><strong>Deposit:</strong> $5 received</p>
+                  <h3 style="color: #7a5566; margin-top: 25px; margin-bottom: 10px;">Appointment Details:</h3>
+                  <p style="color: #2c2c2c; line-height: 1.6;"><strong>Date & Time:</strong> ${selectedSlot}</p>
+                  <p style="color: #2c2c2c; line-height: 1.6;"><strong>Location:</strong> 3073 Parkerhill Rd, Mississauga, ON L5B 1V6</p>
+                  <p style="color: #2c2c2c; line-height: 1.6;"><strong>Service:</strong> At Home Cut n Style ($45)</p>
+                  <p style="color: #2c2c2c; line-height: 1.6;"><strong>Deposit:</strong> $5 received</p>
 
-            <p>We look forward to seeing you!</p>
+                  <p style="margin-top: 30px; color: #2c2c2c; line-height: 1.6;">We look forward to seeing you!</p>
 
-            <p>If you need to make any changes, please contact us directly at hairbydekyi@gmail.com or DM @hairbydekyi on Instagram.</p>
+                  <p style="color: #2c2c2c; line-height: 1.6;">If you need to make any changes, please contact us directly at <a href="mailto:hairbydekyi@gmail.com" style="color: #7a5566; text-decoration: underline;">hairbydekyi@gmail.com</a> or DM <a href="https://www.instagram.com/hairbydekyi/" style="color: #7a5566; text-decoration: underline;">@hairbydekyi</a> on Instagram.</p>
 
-            <p>- Dekyi</p>
+                  <p style="margin-top: 30px; color: #2c2c2c; line-height: 1.6;">
+                    Take care,<br>
+                    <strong>Dekyi</strong><br>
+                    Hair by Dekyi
+                  </p>
 
-            <hr style="border: none; border-top: 1px solid #E8DFD8; margin: 30px 0;">
+                  <hr style="border: none; border-top: 1px solid #cccccc; margin: 30px 0;">
 
-            <p style="font-size: 11px; color: #999; text-align: center;">
-              Need to cancel? <a href="${clientCancelLink}" style="color: #999; text-decoration: underline; font-size: 11px;">Click here</a>
-            </p>
-          `,
-        });
+                  <p style="text-align: center; margin-bottom: 10px;">
+                    <a href="${clientCancelLink}" style="display: inline-block; padding: 12px 24px; background-color: #d9534f; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Cancel Appointment</a>
+                  </p>
+
+                  <p style="font-size: 11px; color: #666666; text-align: center; line-height: 1.5;">
+                    Please note: Your $5 deposit is non-refundable
+                  </p>
+                </div>
+              `,
+            });
+
+            // Check if Resend returned an error
+            if (clientEmailResponse.error) {
+              console.error('Resend API error when sending client confirmation email:', clientEmailResponse.error);
+            } else {
+              console.log(`✓ Client confirmation email sent successfully to ${email}, message ID: ${clientEmailResponse.data?.id}`);
+            }
+          } catch (clientEmailError) {
+            console.error(`Failed to send confirmation email to client ${email}:`, clientEmailError);
+            // Don't throw - continue to admin email
+          }
+        }
 
         // Send notification email to DEKYI
         const calendarLink = `https://calendar.google.com/calendar/u/0/r/week`;
         const adminLink = `https://www.hairbydekyi.com/admin`;
         const cancelLink = `${baseUrl}/api/admin/operations?action=cancel-with-token&token=${depositToken}`;
 
-        await resend.emails.send({
-          from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
-          to: 'hairbydekyi@gmail.com',
-          subject: `Appointment Confirmed: ${name} - ${selectedSlot}`,
-          html: `
-            <h2 style="color: #A8BDA8;">Appointment Confirmed!</h2>
+        try {
+          const adminEmailResponse = await resend.emails.send({
+            from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+            to: 'hairbydekyi@gmail.com',
+            subject: `Appointment Confirmed: ${name} - ${selectedSlot}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #2c2c2c;">
+                <h2 style="color: #8a9d8a; margin-bottom: 20px;">Appointment Confirmed!</h2>
 
-            <p>A client has submitted their deposit and their appointment is now confirmed.</p>
+                <p style="color: #2c2c2c; line-height: 1.6;">A client has submitted their deposit and their appointment is now confirmed.</p>
 
-            <h3 style="color: #8B6D7B;">Appointment Details:</h3>
-            <ul>
-              <li><strong>Client:</strong> ${name}</li>
-              <li><strong>Email:</strong> ${email}</li>
-              <li><strong>Phone:</strong> ${phone}</li>
-              <li><strong>Date & Time:</strong> ${selectedSlot}</li>
-              <li><strong>Status:</strong> Confirmed</li>
-            </ul>
+                <h3 style="color: #7a5566; margin-top: 25px; margin-bottom: 10px;">Appointment Details:</h3>
+                <ul style="color: #2c2c2c; line-height: 1.8;">
+                  <li><strong>Client:</strong> ${name}</li>
+                  <li><strong>Email:</strong> ${email}</li>
+                  <li><strong>Phone:</strong> ${phone}</li>
+                  <li><strong>Date & Time:</strong> ${selectedSlot}</li>
+                  <li><strong>Status:</strong> Confirmed</li>
+                </ul>
 
-            <h3 style="color: #8B6D7B;">Service Details:</h3>
-            <p><strong>Description:</strong> ${serviceDescription || 'Not provided'}</p>
-            ${referencePhotos ? `<p><strong>Reference Photos:</strong> <a href="${referencePhotos}" style="color: #8B6D7B;">View Photos</a></p>` : ''}
+                <h3 style="color: #7a5566; margin-top: 25px; margin-bottom: 10px;">Service Details:</h3>
+                <p style="color: #2c2c2c; line-height: 1.6;"><strong>Description:</strong> ${serviceDescription || 'Not provided'}</p>
+                ${referencePhotos ? `<p style="color: #2c2c2c; line-height: 1.6;"><strong>Reference Photos:</strong> <a href="${referencePhotos}" style="color: #7a5566; text-decoration: underline;">View Photos</a></p>` : ''}
 
-            <h3 style="color: #8B6D7B;">Deposit Information:</h3>
-            <ul>
-              <li><strong>Deposit Screenshot:</strong> <a href="${depositScreenshot}" style="color: #8B6D7B;">View Screenshot</a></li>
-              <li><strong>Submitted:</strong> ${depositTimestamp}</li>
-            </ul>
+                <h3 style="color: #7a5566; margin-top: 25px; margin-bottom: 10px;">Deposit Information:</h3>
+                <ul style="color: #2c2c2c; line-height: 1.8;">
+                  <li><strong>Deposit Screenshot:</strong> <a href="${depositScreenshot}" style="color: #7a5566; text-decoration: underline;">View Screenshot</a></li>
+                  <li><strong>Submitted:</strong> ${depositTimestamp}</li>
+                </ul>
 
-            <p style="margin-top: 30px;">
-              <a href="${calendarLink}" style="display: inline-block; padding: 12px 24px; background-color: #8B6D7B; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px; margin-bottom: 10px;">View Calendar</a>
-              <a href="${adminLink}" style="display: inline-block; padding: 12px 24px; background-color: #A8BDA8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-bottom: 10px;">Manage Bookings</a>
-            </p>
+                <p style="margin-top: 30px;">
+                  <a href="${calendarLink}" style="display: inline-block; padding: 12px 24px; background-color: #7a5566; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px; margin-bottom: 10px;">View Calendar</a>
+                  <a href="${adminLink}" style="display: inline-block; padding: 12px 24px; background-color: #8a9d8a; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-bottom: 10px;">Manage Bookings</a>
+                </p>
 
-            <p style="margin-top: 20px;">
-              <a href="${cancelLink}" style="display: inline-block; padding: 12px 24px; background-color: #d9534f; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Cancel Appointment</a>
-            </p>
+                <p style="margin-top: 20px;">
+                  <a href="${cancelLink}" style="display: inline-block; padding: 12px 24px; background-color: #d9534f; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Cancel Appointment</a>
+                </p>
 
-            <hr style="border: none; border-top: 1px solid #E8DFD8; margin: 30px 0;">
+                <hr style="border: none; border-top: 1px solid #cccccc; margin: 30px 0;">
 
-            <p style="font-size: 12px; color: #7A6A61;">
-              The temporary hold has been replaced with a permanent confirmed appointment on your calendar. You can view all bookings and cancel if needed from the admin panel or using the Cancel Appointment button above.
-            </p>
-          `,
-        });
+                <p style="font-size: 12px; color: #666666; line-height: 1.5;">
+                  The temporary hold has been replaced with a permanent confirmed appointment on your calendar. You can view all bookings and cancel if needed from the admin panel or using the Cancel Appointment button above.
+                </p>
+              </div>
+            `,
+          });
+
+          // Check if Resend returned an error
+          if (adminEmailResponse.error) {
+            console.error('Resend API error when sending admin notification email:', adminEmailResponse.error);
+          } else {
+            console.log(`✓ Admin notification email sent successfully to hairbydekyi@gmail.com, message ID: ${adminEmailResponse.data?.id}`);
+          }
+        } catch (adminEmailError) {
+          console.error('Failed to send admin notification email:', adminEmailError);
+          // Don't throw - the deposit was already processed successfully
+        }
 
         depositsProcessed++;
         processedDeposits.push({

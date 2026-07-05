@@ -983,6 +983,15 @@ async function clientCancel(req, res) {
   const acceptedSlot = bookingData[13] || '';
   const calendarEventId = bookingData[14] || '';
 
+  // Get the actual slot time (not "Slot 1")
+  const slots = [
+    bookingData[4] || '',
+    bookingData[5] || '',
+    bookingData[6] || '',
+  ];
+  const slotNumber = parseInt(acceptedSlot.replace('Slot ', '')) - 1;
+  const selectedSlot = slots[slotNumber] || acceptedSlot;
+
   // Check if already cancelled (idempotency)
   if (status === 'Cancelled' || status === 'Denied') {
     return res.status(200).send(`
@@ -1094,15 +1103,10 @@ async function clientCancel(req, res) {
         <body>
           <h1>Cancel Your Appointment</h1>
 
-          <div class="info">
-            <p><strong>Your Appointment:</strong></p>
-            <p>${acceptedSlot}</p>
-            <p><strong>Location:</strong> 3073 Parkerhill Rd, Mississauga, ON L5B 1V6</p>
-          </div>
-
           <div class="warning">
             <p><strong>⚠️ Are you sure you want to cancel?</strong></p>
             <p>This action cannot be undone. Your $5 deposit is non-refundable.</p>
+            <p style="margin-top: 10px;"><strong>Note:</strong> If you're cancelling to reschedule, your $5 deposit can be used again when you rebook. It's only non-refundable if you're cancelling without rebooking.</p>
           </div>
 
           <form method="POST">
@@ -1205,39 +1209,31 @@ async function clientCancel(req, res) {
     // Send notification email to DEKYI
     const resend = new Resend(process.env.RESEND_API_KEY);
 
-    const slots = [
-      bookingData[4] || '',
-      bookingData[5] || '',
-      bookingData[6] || '',
-    ];
-    const slotNumber = parseInt(acceptedSlot.replace('Slot ', '')) - 1;
-    const selectedSlot = slots[slotNumber] || acceptedSlot;
-
     await resend.emails.send({
       from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
       to: 'hairbydekyi@gmail.com',
       subject: `Client Cancellation: ${name} - ${selectedSlot}`,
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #d9534f;">Client Cancelled Appointment</h2>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #2c2c2c;">
+          <h2 style="color: #c9302c; margin-bottom: 20px;">Client Cancelled Appointment</h2>
 
-          <p>${name} has cancelled their upcoming appointment.</p>
+          <p style="color: #2c2c2c; line-height: 1.6;">${name} has cancelled their upcoming appointment.</p>
 
-          <h3 style="color: #8B6D7B;">Appointment Details:</h3>
-          <ul>
+          <h3 style="color: #7a5566; margin-top: 25px; margin-bottom: 10px;">Appointment Details:</h3>
+          <ul style="color: #2c2c2c; line-height: 1.8;">
             <li><strong>Client:</strong> ${name}</li>
             <li><strong>Email:</strong> ${email}</li>
             <li><strong>Phone:</strong> ${phone}</li>
             <li><strong>Date & Time:</strong> ${selectedSlot}</li>
           </ul>
 
-          <h3 style="color: #8B6D7B;">Cancellation Details:</h3>
-          <p><strong>Reason:</strong> ${cancellationReason}</p>
-          <p><strong>Cancelled at:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'America/Toronto' })}</p>
+          <h3 style="color: #7a5566; margin-top: 25px; margin-bottom: 10px;">Cancellation Details:</h3>
+          <p style="color: #2c2c2c; line-height: 1.6;"><strong>Reason:</strong> ${cancellationReason}</p>
+          <p style="color: #2c2c2c; line-height: 1.6;"><strong>Cancelled at:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'America/Toronto' })}</p>
 
-          <hr style="border: none; border-top: 1px solid #E8DFD8; margin: 30px 0;">
+          <hr style="border: none; border-top: 1px solid #cccccc; margin: 30px 0;">
 
-          <p style="font-size: 12px; color: #7A6A61;">
+          <p style="font-size: 12px; color: #666666; line-height: 1.5;">
             The calendar event has been deleted and this time slot is now available for others to book.
           </p>
         </div>
@@ -1250,18 +1246,18 @@ async function clientCancel(req, res) {
       to: email,
       subject: 'Appointment Cancelled',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #8B6D7B;">Appointment Cancelled</h2>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #2c2c2c;">
+          <h2 style="color: #7a5566; margin-bottom: 20px;">Appointment Cancelled</h2>
 
-          <p>Hi ${name},</p>
+          <p style="color: #2c2c2c; line-height: 1.6;">Hi ${name},</p>
 
-          <p>Your appointment for <strong>${selectedSlot}</strong> has been cancelled as requested.</p>
+          <p style="color: #2c2c2c; line-height: 1.6;">Your appointment for <strong>${selectedSlot}</strong> has been cancelled as requested.</p>
 
-          <p>We're sorry we won't be seeing you this time! If you'd like to reschedule in the future, you're always welcome to book again at <a href="https://www.hairbydekyi.com" style="color: #8B6D7B;">www.hairbydekyi.com</a></p>
+          <p style="color: #2c2c2c; line-height: 1.6;">We're sorry we won't be seeing you this time! If you'd like to reschedule in the future, you're always welcome to book again at <a href="https://www.hairbydekyi.com" style="color: #7a5566; text-decoration: underline;">www.hairbydekyi.com</a></p>
 
-          <p>If you have any questions, feel free to reach out to us at hairbydekyi@gmail.com or DM @hairbydekyi on Instagram.</p>
+          <p style="color: #2c2c2c; line-height: 1.6;">If you have any questions, feel free to reach out to us at <a href="mailto:hairbydekyi@gmail.com" style="color: #7a5566; text-decoration: underline;">hairbydekyi@gmail.com</a> or DM <a href="https://www.instagram.com/hairbydekyi/" style="color: #7a5566; text-decoration: underline;">@hairbydekyi</a> on Instagram.</p>
 
-          <p style="margin-top: 30px;">
+          <p style="margin-top: 30px; color: #2c2c2c; line-height: 1.6;">
             Take care,<br>
             <strong>Dekyi</strong><br>
             Hair by Dekyi
