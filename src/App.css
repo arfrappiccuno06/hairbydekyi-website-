@@ -9,6 +9,14 @@
   position: relative;
 }
 
+/* background-attachment: fixed causes scroll jank/repaints on mobile.
+   Fall back to scroll on small screens (90%+ of traffic is mobile). */
+@media (max-width: 768px) {
+  .app {
+    background-attachment: scroll;
+  }
+}
+
 .app::before {
   content: '';
   position: fixed;

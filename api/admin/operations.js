@@ -1047,84 +1047,127 @@ async function clientCancel(req, res) {
     return res.status(200).send(`
       <html>
         <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
+            html, body {
+              background-color: #F5F1ED;
+            }
             body {
-              font-family: Arial, sans-serif;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              color: #5A4A41;
+              margin: 0;
+              padding: 40px 20px;
+              min-height: 100vh;
+              box-sizing: border-box;
+              line-height: 1.6;
+            }
+            .container {
               max-width: 600px;
-              margin: 50px auto;
-              padding: 20px;
+              margin: 0 auto;
+              background-color: #FEFCFA;
+              border: 1px solid #E8DFD8;
+              border-radius: 12px;
+              padding: 32px;
+              box-shadow: 0 4px 24px rgba(122, 106, 97, 0.10);
             }
-            h1 { color: #8B6D7B; }
+            h1 {
+              font-family: Georgia, 'Times New Roman', serif;
+              color: #8B6D7B;
+              font-size: 1.8rem;
+              margin: 0 0 20px;
+            }
             .warning {
-              background-color: #fff3cd;
-              border: 1px solid #ffc107;
-              padding: 15px;
-              border-radius: 6px;
+              background-color: #F8D7DA;
+              border: 1px solid #E4B7BC;
+              color: #5A4A41;
+              padding: 16px 18px;
+              border-radius: 8px;
               margin: 20px 0;
             }
+            .warning p { margin: 0 0 8px; }
+            .warning p:last-child { margin-bottom: 0; }
             .form-group {
-              margin: 20px 0;
+              margin: 24px 0;
             }
             label {
               display: block;
               margin-bottom: 8px;
-              font-weight: bold;
+              font-weight: 600;
+              color: #7A6A61;
             }
             textarea {
               width: 100%;
               min-height: 100px;
-              padding: 10px;
-              border: 1px solid #ddd;
-              border-radius: 4px;
-              font-family: Arial, sans-serif;
+              padding: 12px;
+              border: 1px solid #E8DFD8;
+              border-radius: 8px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               font-size: 14px;
+              color: #5A4A41;
+              background-color: #FFFFFF;
+              box-sizing: border-box;
+              resize: vertical;
+            }
+            textarea:focus {
+              outline: none;
+              border-color: #8B6D7B;
             }
             button {
-              background-color: #d9534f;
-              color: white;
-              padding: 12px 24px;
+              background-color: #8B6D7B;
+              color: #FFFFFF;
+              padding: 14px 28px;
               border: none;
-              border-radius: 6px;
+              border-radius: 8px;
               font-size: 16px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
               cursor: pointer;
-              font-weight: bold;
+              font-weight: 600;
+              width: 100%;
             }
             button:hover {
-              background-color: #c9302c;
+              background-color: #785d69;
             }
-            .info {
-              background-color: #f5f5f5;
-              padding: 15px;
-              border-radius: 6px;
-              margin-bottom: 20px;
+            .back-link {
+              text-align: center;
+              margin-top: 24px;
+            }
+            .back-link a {
+              color: #8B6D7B;
+              text-decoration: none;
+              font-weight: 500;
+            }
+            .back-link a:hover {
+              text-decoration: underline;
             }
           </style>
         </head>
         <body>
-          <h1>Cancel Your Appointment</h1>
+          <div class="container">
+            <h1>Cancel Your Appointment</h1>
 
-          <div class="warning">
-            <p><strong>⚠️ Are you sure you want to cancel?</strong></p>
-            <p>This action cannot be undone. Your $5 deposit is non-refundable.</p>
-            <p style="margin-top: 10px;"><strong>Note:</strong> If you're cancelling to reschedule, your $5 deposit can be used again when you rebook. It's only non-refundable if you're cancelling without rebooking.</p>
-          </div>
-
-          <form method="POST">
-            <input type="hidden" name="token" value="${token}">
-            <div class="form-group">
-              <label for="reason">Please tell us why you're cancelling (optional):</label>
-              <textarea
-                id="reason"
-                name="cancellationReason"
-                placeholder="We'd appreciate knowing why you need to cancel..."
-              ></textarea>
+            <div class="warning">
+              <p><strong>⚠️ Are you sure you want to cancel?</strong></p>
+              <p>This action cannot be undone. Your $5 deposit is non-refundable.</p>
+              <p><strong>Note:</strong> If you're cancelling to reschedule, your $5 deposit can be used again when you rebook. It's only non-refundable if you're cancelling without rebooking.</p>
             </div>
-            <button type="submit">Yes, Cancel My Appointment</button>
-          </form>
 
-          <p style="text-align: center; margin-top: 20px;">
-            <a href="https://www.hairbydekyi.com" style="color: #8B6D7B;">← Back to website</a>
-          </p>
+            <form method="POST">
+              <input type="hidden" name="token" value="${token}">
+              <div class="form-group">
+                <label for="reason">Please tell us why you're cancelling (optional):</label>
+                <textarea
+                  id="reason"
+                  name="cancellationReason"
+                  placeholder="We'd appreciate knowing why you need to cancel..."
+                ></textarea>
+              </div>
+              <button type="submit">Yes, Cancel My Appointment</button>
+            </form>
+
+            <p class="back-link">
+              <a href="https://www.hairbydekyi.com">← Back to website</a>
+            </p>
+          </div>
         </body>
       </html>
     `);
@@ -1269,25 +1312,54 @@ async function clientCancel(req, res) {
     return res.status(200).send(`
       <html>
         <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
+            html, body {
+              background-color: #F5F1ED;
+            }
             body {
-              font-family: Arial, sans-serif;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              color: #5A4A41;
+              margin: 0;
+              padding: 40px 20px;
+              min-height: 100vh;
+              box-sizing: border-box;
+              line-height: 1.6;
+            }
+            .container {
               max-width: 600px;
-              margin: 50px auto;
-              padding: 20px;
+              margin: 0 auto;
+              background-color: #FEFCFA;
+              border: 1px solid #E8DFD8;
+              border-radius: 12px;
+              padding: 40px 32px;
+              box-shadow: 0 4px 24px rgba(122, 106, 97, 0.10);
               text-align: center;
             }
-            h1 { color: #A8BDA8; }
-            .success { color: #6d5560; }
+            h1 {
+              font-family: Georgia, 'Times New Roman', serif;
+              color: #A8BDA8;
+              font-size: 1.8rem;
+              margin: 0 0 16px;
+            }
+            .success { color: #7A6A61; }
+            .back-link a {
+              color: #8B6D7B;
+              font-weight: 600;
+              text-decoration: none;
+            }
+            .back-link a:hover { text-decoration: underline; }
           </style>
         </head>
         <body>
-          <h1>✓ Appointment Cancelled</h1>
-          <p class="success">Your appointment has been cancelled.</p>
-          <p>You should receive a confirmation email shortly.</p>
-          <p style="margin-top: 30px;">
-            <a href="https://www.hairbydekyi.com" style="color: #8B6D7B; font-weight: bold;">← Back to website</a>
-          </p>
+          <div class="container">
+            <h1>✓ Appointment Cancelled</h1>
+            <p class="success">Your appointment has been cancelled.</p>
+            <p>You should receive a confirmation email shortly.</p>
+            <p class="back-link" style="margin-top: 30px;">
+              <a href="https://www.hairbydekyi.com">← Back to website</a>
+            </p>
+          </div>
         </body>
       </html>
     `);

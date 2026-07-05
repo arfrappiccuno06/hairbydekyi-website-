@@ -51,21 +51,23 @@ export default async function handler(req, res) {
     const calendar = google.calendar({ version: 'v3', auth });
     const calendarId = process.env.GOOGLE_CALENDAR_ID;
 
-    // Fetch schedule configuration from Google Sheets
-    const schedule = await fetchSchedule(auth);
-
     // Get start and end of month
     const startOfMonth = new Date(year, month - 1, 1);
     const endOfMonth = new Date(year, month, 0, 23, 59, 59);
 
-    // Fetch events (busy times)
-    const response = await calendar.events.list({
-      calendarId,
-      timeMin: startOfMonth.toISOString(),
-      timeMax: endOfMonth.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
+    // Fetch schedule (Google Sheets) and events (Google Calendar) in parallel.
+    // Neither depends on the other's result, so running them concurrently
+    // overlaps the two network round-trips instead of waiting sequentially.
+    const [schedule, response] = await Promise.all([
+      fetchSchedule(auth),
+      calendar.events.list({
+        calendarId,
+        timeMin: startOfMonth.toISOString(),
+        timeMax: endOfMonth.toISOString(),
+        singleEvents: true,
+        orderBy: 'startTime',
+      }),
+    ]);
 
     const events = response.data.items || [];
 

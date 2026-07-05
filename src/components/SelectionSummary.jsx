@@ -33,7 +33,7 @@ const SelectionSummary = ({ selectedSlots, onConfirm }) => {
 
       {selectedSlots.length !== 3 && (
         <p className="selection-hint">
-          Please select exactly 3 time slot options to continue. You can choose slots from different days.
+          Choose 3 possible times for your appointment. Only one will be booked, the others are backups in case your first choice isn't available. Feel free to pick times from different days.
         </p>
       )}
 

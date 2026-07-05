@@ -11,6 +11,13 @@
   background-image: url(/hairbydekyibg1.jpg);
 }
 
+/* background-attachment: fixed causes scroll jank/repaints on mobile. */
+@media (max-width: 768px) {
+  .admin-app {
+    background-attachment: scroll;
+  }
+}
+
 .admin-app::before {
   content: '';
   position: fixed;

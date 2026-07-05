@@ -164,20 +164,55 @@ export default async function handler(req, res) {
     const isSlotTaken = busySlots.length > 0;
 
     if (isSlotTaken) {
-      // Slot is already booked - show error with alternative slots
+      // Slot is already booked - figure out which of the OTHER requested slots
+      // are still genuinely free (don't just blindly offer the links).
       const baseUrl = process.env.BASE_URL || 'http://localhost:5173';
-      const alternativeLinks = [];
+      const availableAlternatives = [];
 
       for (let i = 0; i < 3; i++) {
-        if (i !== slotIndex && slots[i]) {
-          alternativeLinks.push(`
-            <p><strong>Slot ${i + 1}:</strong> ${slots[i]}<br>
-            <a href="${baseUrl}/api/accept-booking?token=${token}&slot=${i}">Accept Slot ${i + 1}</a></p>
-          `);
+        if (i === slotIndex || !slots[i]) continue;
+
+        const altParsed = parseSlotString(slots[i], schedule);
+        if (!altParsed) continue;
+
+        const altFreeBusy = await calendar.freebusy.query({
+          requestBody: {
+            timeMin: altParsed.startDateTime,
+            timeMax: altParsed.endDateTime,
+            timeZone: 'America/Toronto',
+            items: [{ id: calendarId }],
+          },
+        });
+
+        const altBusy = altFreeBusy.data.calendars[calendarId].busy || [];
+        if (altBusy.length === 0) {
+          availableAlternatives.push({ index: i, slot: slots[i] });
         }
       }
 
-      // Update status to Conflict
+      // If at least one other slot is still free, offer it. Keep the status as
+      // 'pending_acceptance' so the alternative Accept links below still pass
+      // the idempotency check and can be accepted.
+      if (availableAlternatives.length > 0) {
+        const alternativeLinks = availableAlternatives.map(({ index, slot }) => `
+          <p><strong>Slot ${index + 1}:</strong> ${slot}<br>
+          <a href="${baseUrl}/api/accept-booking?token=${token}&slot=${index}">Accept Slot ${index + 1}</a></p>
+        `);
+
+        return res.status(409).send(`
+          <html>
+            <body>
+              <h1>Slot Already Booked</h1>
+              <p>Unfortunately, this time slot was just booked by someone else.</p>
+              <h2>These alternative slots are still available:</h2>
+              ${alternativeLinks.join('')}
+            </body>
+          </html>
+        `);
+      }
+
+      // None of the three slots are available. Mark the row as Conflict and
+      // automatically email the client asking them to rebook.
       const rowNumber = matchingRowIndex + 1;
       await sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -188,15 +223,46 @@ export default async function handler(req, res) {
         },
       });
 
+      let clientNotified = false;
+      if (email && email.trim() !== '') {
+        try {
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          const rebookResponse = await resend.emails.send({
+            from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+            to: email,
+            subject: 'Please Rebook - Your Requested Times Are No Longer Available',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #2c2c2c;">
+                <h2 style="color: #7a5566; margin-bottom: 20px;">Hi ${name},</h2>
+                <p style="color: #2c2c2c; line-height: 1.6;">Thank you so much for your booking request. Unfortunately, all three of the time slots you selected have since been booked by other clients and are no longer available.</p>
+                <p style="color: #2c2c2c; line-height: 1.6;">We'd still love to get you in! Please head back to our booking page to choose new times that work for you:</p>
+                <p><a href="https://www.hairbydekyi.com" style="display: inline-block; padding: 12px 24px; background-color: #8a9d8a; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Rebook Your Appointment</a></p>
+                <p style="font-size: 0.875rem; color: #666666; margin-top: 8px; line-height: 1.5;">
+                  Button not working? Visit <a href="https://www.hairbydekyi.com" style="color: #7a5566; text-decoration: underline;">hairbydekyi.com</a>
+                </p>
+                <p style="color: #2c2c2c; line-height: 1.6; margin-top: 20px;">We apologize for the inconvenience and hope to see you soon!</p>
+              </div>
+            `,
+          });
+
+          if (rebookResponse.error) {
+            throw new Error(rebookResponse.error.message);
+          }
+          clientNotified = true;
+          console.log(`✓ Rebook email sent successfully to ${email}`);
+        } catch (rebookError) {
+          console.error('Failed to send rebook email to client:', rebookError);
+        }
+      }
+
       return res.status(409).send(`
         <html>
           <body>
-            <h1>Slot Already Booked</h1>
-            <p>Unfortunately, this time slot was just booked by someone else.</p>
-            ${alternativeLinks.length > 0 ? `
-              <h2>Try one of these alternative slots:</h2>
-              ${alternativeLinks.join('')}
-            ` : '<p>No alternative slots available. Please contact the client.</p>'}
+            <h1>No Slots Available</h1>
+            ${clientNotified
+              ? `<p>None of the three slots are available, client has been contacted to rebook.</p>`
+              : `<p>None of the three slots are available. We could not automatically email the client${email ? ` (${email})` : ' (no email on file)'} &mdash; please contact them directly to rebook.</p>`}
+            <p><strong>Client:</strong> ${name}</p>
           </body>
         </html>
       `);

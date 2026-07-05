@@ -59,6 +59,13 @@ const BookingPage = () => {
       // Only add slot if less than 3 are selected
       if (selectedSlots.length < 3) {
         setSelectedSlots([...selectedSlots, { date, time }]);
+        // Auto-scroll to the selected slots panel after it renders/updates
+        setTimeout(() => {
+          const summaryCard = document.querySelector('.selection-summary');
+          if (summaryCard) {
+            summaryCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }, 100);
       }
     }
   };
