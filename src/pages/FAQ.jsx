@@ -26,8 +26,12 @@ const FAQ = () => {
       answer: "While not guaranteed, it's very rare that none of your 3 slots work out! I do my best to accommodate at least one of your preferred times. If none are available, you'll be notified and can submit new time options."
     },
     {
-      question: "What if I need to cancel or reschedule?",
-      answer: "Please contact me as soon as possible via email at hairbydekyi@gmail.com or DM me on Instagram @hairbydekyi. I'll work with you to find a solution."
+      question: "What if I need to cancel my appointment?",
+      answer: "You can cancel directly using the link in your confirmation email. Please note that the $5 deposit is non-refundable. When you cancel, the time slot becomes available for others to book immediately. If you have any issues, contact me at hairbydekyi@gmail.com or DM @hairbydekyi on Instagram."
+    },
+    {
+      question: "What if I already sent my deposit but need to rebook or change my appointment time?",
+      answer: "Cancel your current appointment using the link in your confirmation email, then rebook with new time slots. When submitting your new booking, attach the same deposit screenshot - you only need to e-transfer once per appointment!"
     },
     {
       question: "Where do appointments take place?",
@@ -43,7 +47,7 @@ const FAQ = () => {
     },
     {
       question: "What payment methods are accepted?",
-      answer: "I accept e-transfer for deposits and final payment. You'll receive e-transfer details in your confirmation email."
+      answer: "For the deposit, I accept e-transfer. For final payment, I accept either e-transfer or cash. You'll receive e-transfer details in your confirmation email."
     }
   ];
 
@@ -76,6 +80,8 @@ const FAQ = () => {
             <a href="mailto:hairbydekyi@gmail.com" className="faq-link">hairbydekyi@gmail.com</a>
             {' '}or DM me on Instagram{' '}
             <a href="https://www.instagram.com/hairbydekyi/" target="_blank" rel="noopener noreferrer" className="faq-link">@hairbydekyi</a>
+            . You can also check out my work on TikTok{' '}
+            <a href="https://www.tiktok.com/@hairbydekyi" target="_blank" rel="noopener noreferrer" className="faq-link">@hairbydekyi</a>!
           </p>
         </div>
       </div>

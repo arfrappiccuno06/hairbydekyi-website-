@@ -270,6 +270,20 @@ function Admin() {
       return;
     }
 
+    const cancellationReason = prompt('Please enter the reason for cancellation:');
+
+    if (!cancellationReason || cancellationReason.trim() === '') {
+      alert('Cancellation reason is required');
+      return;
+    }
+
+    // Ask whether to let others book in this slot
+    const letOthersBook = confirm(
+      'Do you want to let others book in this time slot?\n\n' +
+      'Click OK to DELETE the calendar event and allow rebooking.\n' +
+      'Click Cancel to KEEP the event marked as cancelled (slot stays blocked).'
+    );
+
     try {
       const response = await fetch('/api/admin/operations?action=cancel-booking', {
         method: 'POST',
@@ -280,14 +294,25 @@ function Admin() {
           calendarEventId: booking.calendarEventId,
           clientEmail: booking.email,
           clientName: booking.name,
+          cancellationReason: cancellationReason.trim(),
+          deleteCalendarEvent: letOthersBook,
         }),
       });
 
+      const data = await response.json();
+
       if (response.ok) {
-        alert('Booking cancelled and client notified');
+        // Handle idempotent case (already cancelled)
+        if (data.alreadyProcessed) {
+          alert(`This booking was already ${data.message}`);
+        } else {
+          alert('Booking cancelled and client notified');
+        }
         fetchBookings();
       } else {
-        alert('Failed to cancel booking');
+        // Show specific error message from backend
+        const errorMsg = data.error || 'Failed to cancel booking';
+        alert(errorMsg);
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
@@ -485,7 +510,7 @@ function Admin() {
                       )}
                     </div>
 
-                    {booking.status === 'Accepted' && (
+                    {['pending_deposit', 'confirmed', 'Accepted'].includes(booking.status) && (
                       <button
                         onClick={() => cancelBooking(booking)}
                         className="cancel-booking-button"

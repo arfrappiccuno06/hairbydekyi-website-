@@ -196,6 +196,8 @@ export default async function handler(req, res) {
         });
 
         // Send confirmation email to client
+        const clientCancelLink = `${baseUrl}/api/admin/operations?action=client-cancel&token=${depositToken}`;
+
         await resend.emails.send({
           from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
           to: email,
@@ -216,12 +218,20 @@ export default async function handler(req, res) {
             <p>If you need to make any changes, please contact us directly at hairbydekyi@gmail.com or DM @hairbydekyi on Instagram.</p>
 
             <p>- Dekyi</p>
+
+            <hr style="border: none; border-top: 1px solid #E8DFD8; margin: 30px 0;">
+
+            <p style="font-size: 11px; color: #999; text-align: center;">
+              Need to cancel? <a href="${clientCancelLink}" style="color: #999; text-decoration: underline; font-size: 11px;">Click here</a>
+            </p>
           `,
         });
 
         // Send notification email to DEKYI
         const calendarLink = `https://calendar.google.com/calendar/u/0/r/week`;
         const adminLink = `https://www.hairbydekyi.com/admin`;
+        const baseUrl = process.env.BASE_URL || 'https://www.hairbydekyi.com';
+        const cancelLink = `${baseUrl}/api/admin/operations?action=cancel-with-token&token=${bookingDepositToken}`;
 
         await resend.emails.send({
           from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
@@ -252,14 +262,18 @@ export default async function handler(req, res) {
             </ul>
 
             <p style="margin-top: 30px;">
-              <a href="${calendarLink}" style="display: inline-block; padding: 12px 24px; background-color: #8B6D7B; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">View Calendar</a>
-              <a href="${adminLink}" style="display: inline-block; padding: 12px 24px; background-color: #A8BDA8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Manage Bookings</a>
+              <a href="${calendarLink}" style="display: inline-block; padding: 12px 24px; background-color: #8B6D7B; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px; margin-bottom: 10px;">View Calendar</a>
+              <a href="${adminLink}" style="display: inline-block; padding: 12px 24px; background-color: #A8BDA8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-bottom: 10px;">Manage Bookings</a>
+            </p>
+
+            <p style="margin-top: 20px;">
+              <a href="${cancelLink}" style="display: inline-block; padding: 12px 24px; background-color: #d9534f; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Cancel Appointment</a>
             </p>
 
             <hr style="border: none; border-top: 1px solid #E8DFD8; margin: 30px 0;">
 
             <p style="font-size: 12px; color: #7A6A61;">
-              The temporary hold has been replaced with a permanent confirmed appointment on your calendar. You can view all bookings and cancel if needed from the admin panel.
+              The temporary hold has been replaced with a permanent confirmed appointment on your calendar. You can view all bookings and cancel if needed from the admin panel or using the Cancel Appointment button above.
             </p>
           `,
         });
