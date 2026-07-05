@@ -147,7 +147,7 @@ export default async function handler(req, res) {
             `\nReference Photos: ${referencePhotos || 'NOT PROVIDED'}`,
             `\nDeposit Screenshot: ${depositScreenshot}`,
             `\nDeposit Received: ${depositTimestamp}`,
-            `\nNeed to cancel this appointment? Go to the admin page: https://www.hairbydekyi.com/admin`,
+            `\nNeed to cancel this appointment? Click here: ${process.env.BASE_URL || 'https://www.hairbydekyi.com'}/api/admin/operations?action=cancel-with-token&token=${depositToken}`,
           ].join('\n'),
           start: {
             dateTime: startDateTime,
