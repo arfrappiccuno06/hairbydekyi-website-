@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import './About.css';
 
 const About = () => {
-  const fullText = "Hi! I'm Dekyi. I am a recent graduate from Marca College and hold a Hair Styling Diploma. Check out my work on my instagram page @hairbydekyi and book with me :)";
+  const fullText = "Hi! I'm Dekyi. I am a recent graduate from Marca College and hold a Hair Styling Diploma. Check out my work on my Instagram or TikTok and book with me :)";
   const [displayedText, setDisplayedText] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTypingComplete, setIsTypingComplete] = useState(false);
@@ -20,31 +20,35 @@ const About = () => {
     }
   }, [currentIndex, fullText]);
 
-  // Function to render text with Instagram link
+  // Function to render text with Instagram and TikTok links
   const renderText = () => {
-    const instagramHandle = '@hairbydekyi';
-    const instagramIndex = displayedText.indexOf(instagramHandle);
-
-    if (instagramIndex === -1 || !isTypingComplete) {
+    // While the typewriter effect is still running, show plain text
+    if (!isTypingComplete) {
       return displayedText;
     }
 
-    const beforeLink = displayedText.substring(0, instagramIndex);
-    const afterLink = displayedText.substring(instagramIndex + instagramHandle.length);
+    const links = {
+      Instagram: 'https://www.instagram.com/hairbydekyi/',
+      TikTok: 'https://www.tiktok.com/@hairbydekyi',
+    };
 
-    return (
-      <>
-        {beforeLink}
+    // Split on the link words and turn matches into anchors
+    const parts = displayedText.split(/(Instagram|TikTok)/);
+
+    return parts.map((part, index) =>
+      links[part] ? (
         <a
-          href="https://www.instagram.com/hairbydekyi/"
+          key={index}
+          href={links[part]}
           target="_blank"
           rel="noopener noreferrer"
           className="instagram-link"
         >
-          {instagramHandle}
+          {part}
         </a>
-        {afterLink}
-      </>
+      ) : (
+        part
+      )
     );
   };
 
