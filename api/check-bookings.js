@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
-import { Resend } from 'resend';
 import { generateToken } from '../utils/tokens.js';
+import { sendEmail, drainEmailQueue } from '../utils/email.js';
 
 export default async function handler(req, res) {
   try {
@@ -43,9 +43,6 @@ export default async function handler(req, res) {
         error: 'Please add a "Notified" column to your Google Sheet as the last column'
       });
     }
-
-    // Initialize Resend
-    const resend = new Resend(process.env.RESEND_API_KEY);
 
     let emailsSent = 0;
     const newBookings = [];
@@ -106,13 +103,22 @@ export default async function handler(req, res) {
       `;
 
       try {
-        // Send email via Resend
-        await resend.emails.send({
+        // Send email (self-healing: failures are parked in the Email Queue tab
+        // and retried by the queue drain below).
+        const emailResponse = await sendEmail(auth, {
           from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
           to: 'hairbydekyi@gmail.com',
           subject: `New Booking Request from ${name}`,
           html: emailHtml,
         });
+
+        // If the send failed AND couldn't even be queued, leave the row
+        // un-notified so the next cron run retries the whole notification.
+        if (emailResponse.error && !emailResponse.queued) {
+          throw new Error(
+            `Email neither sent nor queued: ${emailResponse.error.message}`
+          );
+        }
 
         // Update Sheet: Mark as notified (K), add token (L), set status to pending_acceptance (M)
         // Column K = Notified, Column L = Token, Column M = Status
@@ -145,14 +151,25 @@ export default async function handler(req, res) {
 
       } catch (emailError) {
         console.error('Failed to send email for row', i, emailError);
-        // Continue processing other rows even if one fails
+        // Row is left un-notified on purpose: the next cron run will retry it
+        // (auto-recovers when the Resend quota resets). Continue with other rows.
       }
+    }
+
+    // Retry any previously-failed emails parked in the outbox. Wrapped so a
+    // drain error never breaks booking processing.
+    let queueDrained = { attempted: 0, sent: 0 };
+    try {
+      queueDrained = await drainEmailQueue(auth);
+    } catch (drainError) {
+      console.error('Error draining email queue:', drainError);
     }
 
     return res.status(200).json({
       success: true,
       emailsSent,
       newBookings,
+      queueDrained,
     });
 
   } catch (error) {

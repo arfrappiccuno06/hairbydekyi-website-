@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
-import { Resend } from 'resend';
 import { fetchSchedule, findSlotByTime } from '../utils/schedule.js';
+import { sendEmail } from '../utils/email.js';
 
 export default async function handler(req, res) {
   try {
@@ -49,7 +49,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: 'No bookings found' });
     }
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
     let depositsProcessed = 0;
     const processedDeposits = [];
 
@@ -207,7 +206,7 @@ export default async function handler(req, res) {
           const clientCancelLink = `${baseUrl}/api/admin/operations?action=client-cancel&token=${depositToken}`;
 
           try {
-            const clientEmailResponse = await resend.emails.send({
+            const clientEmailResponse = await sendEmail(auth, {
               from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
               to: email,
               subject: 'Appointment confirmed! See you soon',
@@ -264,7 +263,7 @@ export default async function handler(req, res) {
         const cancelLink = `${baseUrl}/api/admin/operations?action=cancel-with-token&token=${depositToken}`;
 
         try {
-          const adminEmailResponse = await resend.emails.send({
+          const adminEmailResponse = await sendEmail(auth, {
             from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
             to: 'hairbydekyi@gmail.com',
             subject: `Appointment Confirmed: ${name} - ${selectedSlot}`,

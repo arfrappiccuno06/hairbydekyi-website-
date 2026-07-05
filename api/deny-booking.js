@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { Resend } from 'resend';
+import { sendEmail } from '../utils/email.js';
 
 export default async function handler(req, res) {
   try {
@@ -113,11 +113,10 @@ export default async function handler(req, res) {
       },
     });
 
-    // Send polite rejection email to client
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    // Send polite rejection email to client (self-healing via Email Queue)
     const baseUrl = process.env.BASE_URL || 'http://localhost:5173';
 
-    await resend.emails.send({
+    await sendEmail(auth, {
       from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
       to: email,
       subject: 'Booking Request Update',

@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
-import { Resend } from 'resend';
 import { getSessionFromCookie, verifySessionToken } from '../../utils/auth.js';
+import { sendEmail } from '../../utils/email.js';
 
 export default async function handler(req, res) {
   const { action } = req.query;
@@ -392,9 +392,7 @@ async function cancelBooking(req, res) {
     },
   });
 
-  // Send cancellation email to client
-  const resend = new Resend(process.env.RESEND_API_KEY);
-
+  // Send cancellation email to client (self-healing via Email Queue)
   const emailHtml = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #8B6D7B;">Appointment Cancellation</h2>
@@ -433,8 +431,8 @@ async function cancelBooking(req, res) {
   `;
 
   try {
-    await resend.emails.send({
-      from: 'Hair by Dekyi <onboarding@resend.dev>',
+    await sendEmail(auth, {
+      from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
       to: clientEmail,
       subject: 'Appointment Cancellation - We\'re Sorry',
       html: emailHtml,
@@ -826,9 +824,7 @@ async function cancelWithToken(req, res) {
       },
     });
 
-    // Send cancellation email to client
-    const resend = new Resend(process.env.RESEND_API_KEY);
-
+    // Send cancellation email to client (self-healing via Email Queue)
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #8B6D7B;">Appointment Cancellation</h2>
@@ -867,7 +863,7 @@ async function cancelWithToken(req, res) {
     `;
 
     try {
-      await resend.emails.send({
+      await sendEmail(auth, {
         from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
         to: email,
         subject: 'Appointment Cancellation - We\'re Sorry',
@@ -1249,10 +1245,8 @@ async function clientCancel(req, res) {
       },
     });
 
-    // Send notification email to DEKYI
-    const resend = new Resend(process.env.RESEND_API_KEY);
-
-    await resend.emails.send({
+    // Send notification email to DEKYI (self-healing via Email Queue)
+    await sendEmail(auth, {
       from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
       to: 'hairbydekyi@gmail.com',
       subject: `Client Cancellation: ${name} - ${selectedSlot}`,
@@ -1284,7 +1278,7 @@ async function clientCancel(req, res) {
     });
 
     // Send confirmation email to client
-    await resend.emails.send({
+    await sendEmail(auth, {
       from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
       to: email,
       subject: 'Appointment Cancelled',

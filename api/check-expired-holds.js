@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { Resend } from 'resend';
+import { sendEmail } from '../utils/email.js';
 
 export default async function handler(req, res) {
   try {
@@ -33,7 +33,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: 'No bookings found' });
     }
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
     const now = new Date();
     let expiredCount = 0;
     const expiredBookings = [];
@@ -108,7 +107,7 @@ export default async function handler(req, res) {
         // Send expiration email to client
         const baseUrl = process.env.BASE_URL || 'https://hairbydekyi.vercel.app';
 
-        await resend.emails.send({
+        await sendEmail(auth, {
           from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
           to: email,
           subject: 'Your time slot was not reserved',

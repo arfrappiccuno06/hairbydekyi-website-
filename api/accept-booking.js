@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
-import { Resend } from 'resend';
 import { fetchSchedule, findSlotByTime } from '../utils/schedule.js';
 import { generateToken } from '../utils/tokens.js';
+import { sendEmail } from '../utils/email.js';
 
 export default async function handler(req, res) {
   try {
@@ -225,13 +225,11 @@ export default async function handler(req, res) {
 
       let clientNotified = false;
       if (email && email.trim() !== '') {
-        try {
-          const resend = new Resend(process.env.RESEND_API_KEY);
-          const rebookResponse = await resend.emails.send({
-            from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
-            to: email,
-            subject: 'Please Rebook - Your Requested Times Are No Longer Available',
-            html: `
+        const rebookResponse = await sendEmail(auth, {
+          from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+          to: email,
+          subject: 'Please Rebook - Your Requested Times Are No Longer Available',
+          html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #2c2c2c;">
                 <h2 style="color: #7a5566; margin-bottom: 20px;">Hi ${name},</h2>
                 <p style="color: #2c2c2c; line-height: 1.6;">Thank you so much for your booking request. Unfortunately, all three of the time slots you selected have since been booked by other clients and are no longer available.</p>
@@ -243,16 +241,11 @@ export default async function handler(req, res) {
                 <p style="color: #2c2c2c; line-height: 1.6; margin-top: 20px;">We apologize for the inconvenience and hope to see you soon!</p>
               </div>
             `,
-          });
+        });
 
-          if (rebookResponse.error) {
-            throw new Error(rebookResponse.error.message);
-          }
-          clientNotified = true;
-          console.log(`✓ Rebook email sent successfully to ${email}`);
-        } catch (rebookError) {
-          console.error('Failed to send rebook email to client:', rebookError);
-        }
+        // Sent outright, or safely queued for retry — either way the client
+        // will be contacted, so tell the stylist it's handled.
+        clientNotified = !rebookResponse.error || rebookResponse.queued;
       }
 
       return res.status(409).send(`
@@ -369,15 +362,12 @@ export default async function handler(req, res) {
       `);
     }
 
-    // Send deposit request email to CLIENT
-    const resend = new Resend(process.env.RESEND_API_KEY);
-
-    try {
-      const emailResponse = await resend.emails.send({
-        from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
-        to: email,
-        subject: 'Submit Your Deposit in 24 hrs - Appointment Approved',
-        html: `
+    // Send deposit request email to CLIENT (self-healing via Email Queue)
+    const emailResponse = await sendEmail(auth, {
+      from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+      to: email,
+      subject: 'Submit Your Deposit in 24 hrs - Appointment Approved',
+      html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #2c2c2c;">
             <h2 style="color: #8a9d8a; margin-bottom: 20px;">Great news, ${name}!</h2>
             <p style="color: #2c2c2c; line-height: 1.6;">Your requested time slot for <strong>${selectedSlot}</strong> has been approved.</p>
@@ -406,15 +396,11 @@ export default async function handler(req, res) {
         `,
       });
 
-      // Check if Resend returned an error
-      if (emailResponse.error) {
-        console.error('Resend API error when sending deposit email:', emailResponse.error);
-        throw new Error(`Resend API error: ${emailResponse.error.message}`);
-      }
-
-      console.log(`✓ Deposit email sent successfully to ${email}, message ID: ${emailResponse.data?.id}`);
-    } catch (emailError) {
-      console.error('Failed to send deposit email to client:', emailError);
+    // Only fail loudly if the email neither sent nor got queued for retry.
+    // If it was queued (e.g. quota hit), it will be delivered automatically
+    // when the quota clears, so we can proceed to the success page.
+    if (emailResponse.error && !emailResponse.queued) {
+      console.error('Failed to send/queue deposit email to client:', emailResponse.error);
       return res.status(500).send(`
         <html>
           <body>
@@ -422,7 +408,7 @@ export default async function handler(req, res) {
             <p>The booking was accepted and the calendar hold was created, but we failed to send the deposit request email.</p>
             <p><strong>Client:</strong> ${name}</p>
             <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Error:</strong> ${emailError.message}</p>
+            <p><strong>Error:</strong> ${emailResponse.error.message}</p>
             <p style="margin-top: 20px; color: #d9534f;"><strong>ACTION REQUIRED:</strong> Please contact the client directly to request their deposit. The calendar hold will expire in 24 hours if not received.</p>
           </body>
         </html>
@@ -437,7 +423,7 @@ export default async function handler(req, res) {
           <p><strong>Client:</strong> ${name}</p>
           <p><strong>Approved Time:</strong> ${selectedSlot}</p>
           <p><strong>Status:</strong> Pending deposit (24-hour hold created)</p>
-          <p>An email has been sent to ${email} with instructions to submit the deposit.</p>
+          <p>An email has been sent to ${email} (or will be delivered shortly) with instructions to submit the deposit.</p>
           <p>The calendar has been temporarily blocked until deposit is received or 24 hours expire.</p>
         </body>
       </html>
