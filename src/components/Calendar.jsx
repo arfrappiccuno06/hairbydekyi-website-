@@ -1,4 +1,3 @@
-import React from 'react';
 import './Calendar.css';
 
 const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -8,6 +7,20 @@ const MONTHS = [
 ];
 
 const Calendar = ({ selectedDate, onDateSelect, selectedSlots, availability, loading, error, currentMonth, onMonthChange }) => {
+
+  // Get current month/year in Toronto timezone
+  const getCurrentTorontoMonth = () => {
+    const nowUTC = new Date();
+    const torontoFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Toronto',
+      year: 'numeric',
+      month: 'numeric',
+    });
+    const torontoParts = torontoFormatter.formatToParts(nowUTC);
+    const torontoYear = parseInt(torontoParts.find(p => p.type === 'year').value);
+    const torontoMonth = parseInt(torontoParts.find(p => p.type === 'month').value) - 1; // 0-indexed
+    return { year: torontoYear, month: torontoMonth };
+  };
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -29,6 +42,19 @@ const Calendar = ({ selectedDate, onDateSelect, selectedSlots, availability, loa
   const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentMonth);
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
+
+  // Check if viewing a future month
+  const currentTorontoMonth = getCurrentTorontoMonth();
+  const isFutureMonth =
+    year > currentTorontoMonth.year ||
+    (year === currentTorontoMonth.year && month > currentTorontoMonth.month);
+
+  // Calculate last day of previous month for the message
+  const getLastDayOfPreviousMonth = () => {
+    const prevMonthDate = new Date(year, month - 1);
+    const lastDay = new Date(year, month, 0).getDate();
+    return `${MONTHS[prevMonthDate.getMonth()]} ${lastDay}`;
+  };
 
   const prevMonth = () => {
     onMonthChange(new Date(year, month - 1));
@@ -122,6 +148,12 @@ const Calendar = ({ selectedDate, onDateSelect, selectedSlots, availability, loa
       {loading ? (
         <div className="calendar-loading">
           <p>Loading availability...</p>
+        </div>
+      ) : isFutureMonth ? (
+        <div className="calendar-future-month-message">
+          <p className="future-month-text">
+            {MONTHS[month]} bookings will open {getLastDayOfPreviousMonth()}
+          </p>
         </div>
       ) : (
         <>
