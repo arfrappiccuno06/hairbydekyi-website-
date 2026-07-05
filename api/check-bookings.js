@@ -58,7 +58,8 @@ export default async function handler(req, res) {
       }
 
       // Extract booking details
-      // A=Timestamp, B=Name, C=Email, D=Phone, E=Slot1, F=Slot2, G=Slot3
+      // A=Timestamp, B=Name, C=Email, D=Phone, E=Slot1, F=Slot2, G=Slot3,
+      // H=ServiceDescription, I=ReferencePhotos
       const timestamp = row[0] || '';
       const name = row[1] || '';
       const email = row[2] || '';
@@ -66,6 +67,17 @@ export default async function handler(req, res) {
       const slot1 = row[4] || '';
       const slot2 = row[5] || '';
       const slot3 = row[6] || '';
+      const serviceDescription = row[7] || '';
+      const referencePhotos = row[8] || '';
+
+      // Reference photos come from the Google Form file upload as one or more
+      // Drive URLs (comma-separated when multiple). Render each as a link.
+      const referencePhotosHtml = referencePhotos
+        ? referencePhotos
+            .split(',')
+            .map((url, idx) => `<a href="${url.trim()}">Photo ${idx + 1}</a>`)
+            .join(' &middot; ')
+        : 'Not provided';
 
       // Generate token for this booking
       const token = generateToken();
@@ -83,6 +95,8 @@ export default async function handler(req, res) {
         <p><strong>Submitted:</strong> ${timestamp}</p>
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Phone:</strong> ${phone}</p>
+        <p><strong>Service Description:</strong> ${serviceDescription || 'Not provided'}</p>
+        <p><strong>Reference Photos:</strong> ${referencePhotosHtml}</p>
 
         <h3>Choose ONE slot to accept:</h3>
         <p><strong>Slot 1:</strong> ${slot1}<br>
