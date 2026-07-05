@@ -147,6 +147,7 @@ export default async function handler(req, res) {
             `\nReference Photos: ${referencePhotos || 'NOT PROVIDED'}`,
             `\nDeposit Screenshot: ${depositScreenshot}`,
             `\nDeposit Received: ${depositTimestamp}`,
+            `\nNeed to cancel this appointment? Go to the admin page: https://www.hairbydekyi.com/admin`,
           ].join('\n'),
           start: {
             dateTime: startDateTime,
@@ -193,6 +194,12 @@ export default async function handler(req, res) {
             ],
           },
         });
+
+        // Reflect the just-written timestamp in the in-memory copy so a second
+        // deposit row for the SAME booking in this same cron run is recognized
+        // as already processed (bookingRows was read once at the start, so
+        // otherwise the guard above would see a stale empty value).
+        matchingBooking[18] = now.toISOString(); // Column S = deposit_received_timestamp
 
         // Define base URL first (needed for both client and admin emails)
         const baseUrl = process.env.BASE_URL || 'https://www.hairbydekyi.com';

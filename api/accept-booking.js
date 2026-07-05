@@ -270,6 +270,7 @@ export default async function handler(req, res) {
       `\nService Description: ${serviceDescription}`,
       `\nReference Photos: ${referencePhotos || 'NOT PROVIDED'}`,
       `\nDeposit deadline: 24 hours from acceptance`,
+      `\nNeed to cancel this appointment? Go to the admin page: https://www.hairbydekyi.com/admin`,
     ];
 
     const tempEvent = {
