@@ -219,6 +219,51 @@ export default async function handler(req, res) {
           `,
         });
 
+        // Send notification email to DEKYI
+        const calendarLink = `https://calendar.google.com/calendar/u/0/r/week`;
+        const adminLink = `https://www.hairbydekyi.com/admin`;
+
+        await resend.emails.send({
+          from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+          to: 'hairbydekyi@gmail.com',
+          subject: `Appointment Confirmed: ${name} - ${selectedSlot}`,
+          html: `
+            <h2 style="color: #A8BDA8;">Appointment Confirmed!</h2>
+
+            <p>A client has submitted their deposit and their appointment is now confirmed.</p>
+
+            <h3 style="color: #8B6D7B;">Appointment Details:</h3>
+            <ul>
+              <li><strong>Client:</strong> ${name}</li>
+              <li><strong>Email:</strong> ${email}</li>
+              <li><strong>Phone:</strong> ${phone}</li>
+              <li><strong>Date & Time:</strong> ${selectedSlot}</li>
+              <li><strong>Status:</strong> Confirmed</li>
+            </ul>
+
+            <h3 style="color: #8B6D7B;">Service Details:</h3>
+            <p><strong>Description:</strong> ${serviceDescription || 'Not provided'}</p>
+            ${referencePhotos ? `<p><strong>Reference Photos:</strong> <a href="${referencePhotos}" style="color: #8B6D7B;">View Photos</a></p>` : ''}
+
+            <h3 style="color: #8B6D7B;">Deposit Information:</h3>
+            <ul>
+              <li><strong>Deposit Screenshot:</strong> <a href="${depositScreenshot}" style="color: #8B6D7B;">View Screenshot</a></li>
+              <li><strong>Submitted:</strong> ${depositTimestamp}</li>
+            </ul>
+
+            <p style="margin-top: 30px;">
+              <a href="${calendarLink}" style="display: inline-block; padding: 12px 24px; background-color: #8B6D7B; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">View Calendar</a>
+              <a href="${adminLink}" style="display: inline-block; padding: 12px 24px; background-color: #A8BDA8; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Manage Bookings</a>
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #E8DFD8; margin: 30px 0;">
+
+            <p style="font-size: 12px; color: #7A6A61;">
+              The temporary hold has been replaced with a permanent confirmed appointment on your calendar. You can view all bookings and cancel if needed from the admin panel.
+            </p>
+          `,
+        });
+
         depositsProcessed++;
         processedDeposits.push({
           name,
