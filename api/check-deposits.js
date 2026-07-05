@@ -195,6 +195,9 @@ export default async function handler(req, res) {
           },
         });
 
+        // Define base URL first (needed for both client and admin emails)
+        const baseUrl = process.env.BASE_URL || 'https://www.hairbydekyi.com';
+
         // Send confirmation email to client
         const clientCancelLink = `${baseUrl}/api/admin/operations?action=client-cancel&token=${depositToken}`;
 
@@ -230,8 +233,7 @@ export default async function handler(req, res) {
         // Send notification email to DEKYI
         const calendarLink = `https://calendar.google.com/calendar/u/0/r/week`;
         const adminLink = `https://www.hairbydekyi.com/admin`;
-        const baseUrl = process.env.BASE_URL || 'https://www.hairbydekyi.com';
-        const cancelLink = `${baseUrl}/api/admin/operations?action=cancel-with-token&token=${bookingDepositToken}`;
+        const cancelLink = `${baseUrl}/api/admin/operations?action=cancel-with-token&token=${depositToken}`;
 
         await resend.emails.send({
           from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
