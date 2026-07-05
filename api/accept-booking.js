@@ -290,7 +290,7 @@ export default async function handler(req, res) {
     await resend.emails.send({
       from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
       to: email,
-      subject: 'Your appointment request has been approved!',
+      subject: 'Submit Your Deposit in 24 hrs - Appointment Approved',
       html: `
         <h2>Great news, ${name}!</h2>
         <p>Your requested time slot for <strong>${selectedSlot}</strong> has been approved.</p>
