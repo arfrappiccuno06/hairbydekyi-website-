@@ -156,6 +156,23 @@
   font-size: 1rem;
 }
 
+.calendar-future-month-message {
+  text-align: center;
+  padding: 4rem 1.5rem;
+  min-height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.future-month-text {
+  color: var(--text-dark);
+  font-size: 1.125rem;
+  line-height: 1.6;
+  font-weight: 500;
+  margin: 0;
+}
+
 .calendar-error {
   text-align: center;
   padding: 3rem 1.5rem;
