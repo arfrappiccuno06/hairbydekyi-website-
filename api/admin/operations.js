@@ -9,12 +9,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Action parameter is required' });
   }
 
-  // Verify admin session for all operations
-  const cookieHeader = req.headers.cookie;
-  const sessionToken = getSessionFromCookie(cookieHeader);
+  // Skip auth for token-based actions (uses token-based auth instead)
+  if (action !== 'cancel-with-token' && action !== 'client-cancel') {
+    // Verify admin session for all other operations
+    const cookieHeader = req.headers.cookie;
+    const sessionToken = getSessionFromCookie(cookieHeader);
 
-  if (!sessionToken || !verifySessionToken(sessionToken)) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    if (!sessionToken || !verifySessionToken(sessionToken)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
   }
 
   try {
@@ -27,6 +30,10 @@ export default async function handler(req, res) {
         return await getBookings(req, res);
       case 'cancel-booking':
         return await cancelBooking(req, res);
+      case 'cancel-with-token':
+        return await cancelWithToken(req, res);
+      case 'client-cancel':
+        return await clientCancel(req, res);
       default:
         return res.status(400).json({ error: 'Invalid action' });
     }
@@ -284,11 +291,11 @@ async function cancelBooking(req, res) {
   }
 
   // Get booking details from request body
-  const { rowIndex, calendarEventId, clientEmail, clientName } = req.body;
+  const { rowIndex, calendarEventId, clientEmail, clientName, cancellationReason, deleteCalendarEvent } = req.body;
 
-  if (!rowIndex || !clientEmail || !clientName) {
+  if (!rowIndex || !clientEmail || !clientName || !cancellationReason) {
     return res.status(400).json({
-      error: 'rowIndex, clientEmail, and clientName are required'
+      error: 'rowIndex, clientEmail, clientName, and cancellationReason are required'
     });
   }
 
@@ -310,20 +317,68 @@ async function cancelBooking(req, res) {
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
   const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
 
-  // Update the Calendar event (mark as cancelled but keep it)
+  // EDGE CASE 1: Read current status to check if already cancelled (idempotency)
+  const currentStatusResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `Booking Form!M${rowIndex}`, // Column M = Status
+  });
+
+  const currentStatus = currentStatusResponse.data.values?.[0]?.[0] || '';
+
+  // If already cancelled or denied, return early (idempotent)
+  if (currentStatus === 'Cancelled' || currentStatus === 'Denied') {
+    return res.status(200).json({
+      success: true,
+      message: `Booking already ${currentStatus.toLowerCase()}`,
+      alreadyProcessed: true,
+    });
+  }
+
+  // Check if status is cancellable
+  const cancellableStatuses = ['pending_deposit', 'confirmed', 'Accepted'];
+  if (!cancellableStatuses.includes(currentStatus)) {
+    return res.status(400).json({
+      error: `Cannot cancel booking with status: ${currentStatus}`,
+      currentStatus,
+    });
+  }
+
+  // EDGE CASE 2: Delete or update the Calendar event based on user choice
   if (calendarEventId) {
     try {
-      await calendar.events.patch({
+      // Check if event exists first
+      await calendar.events.get({
         calendarId,
         eventId: calendarEventId,
-        requestBody: {
-          summary: '[CANCELLED] Hair Appointment',
-          description: `This appointment was cancelled by the stylist.\n\nClient: ${clientName}`,
-        },
       });
+
+      if (deleteCalendarEvent) {
+        // DELETE the event to allow others to book this slot
+        await calendar.events.delete({
+          calendarId,
+          eventId: calendarEventId,
+        });
+        console.log(`Calendar event ${calendarEventId} deleted to allow rebooking`);
+      } else {
+        // PATCH the event to mark as cancelled but keep slot blocked
+        await calendar.events.patch({
+          calendarId,
+          eventId: calendarEventId,
+          requestBody: {
+            summary: '[CANCELLED] Hair Appointment',
+            description: `This appointment was cancelled by the stylist.\n\nClient: ${clientName}\n\nReason: ${cancellationReason}`,
+          },
+        });
+        console.log(`Calendar event ${calendarEventId} marked as cancelled`);
+      }
     } catch (calError) {
-      console.error('Error updating calendar event:', calError);
-      // Continue even if calendar update fails
+      // EDGE CASE 3: Calendar event doesn't exist or can't be updated/deleted
+      if (calError.code === 404) {
+        console.warn(`Calendar event ${calendarEventId} not found, continuing with sheet update`);
+      } else {
+        console.error('Error updating/deleting calendar event:', calError);
+      }
+      // Continue even if calendar operation fails
     }
   }
 
@@ -347,6 +402,8 @@ async function cancelBooking(req, res) {
       <p>Hi ${clientName},</p>
 
       <p>We're reaching out with some unfortunate news. We sincerely apologize, but we need to cancel your upcoming hair appointment.</p>
+
+      <p><strong>Reason:</strong> ${cancellationReason}</p>
 
       <p>We understand how disappointing this can be, especially when you've been looking forward to your appointment. Please know this decision wasn't made lightly.</p>
 
@@ -403,4 +460,842 @@ function getDayOfWeek(dateString) {
   const date = new Date(dateString + 'T00:00:00');
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   return days[date.getDay()];
+}
+
+async function cancelWithToken(req, res) {
+  const { token } = req.query;
+
+  if (!token) {
+    return res.status(400).send(`
+      <html>
+        <body>
+          <h1>Invalid Request</h1>
+          <p>Missing token parameter.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Authenticate with Google
+  const credentials = JSON.parse(
+    Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8')
+  );
+
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: [
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/calendar',
+    ],
+  });
+
+  const sheets = google.sheets({ version: 'v4', auth });
+  const calendar = google.calendar({ version: 'v3', auth });
+  const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
+
+  // Read all rows to find the matching token
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: 'Booking Form!A:T',
+  });
+
+  const rows = response.data.values;
+  if (!rows || rows.length <= 1) {
+    return res.status(404).send(`
+      <html>
+        <body>
+          <h1>Booking Not Found</h1>
+          <p>No booking found with this token.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Find the row with matching deposit token (Column Q = index 16)
+  let matchingRowIndex = -1;
+  let bookingData = null;
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][16] === token) {
+      matchingRowIndex = i;
+      bookingData = rows[i];
+      break;
+    }
+  }
+
+  if (!bookingData) {
+    return res.status(404).send(`
+      <html>
+        <body>
+          <h1>Booking Not Found</h1>
+          <p>Invalid or expired token.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  const name = bookingData[1] || '';
+  const email = bookingData[2] || '';
+  const status = bookingData[12] || '';
+  const calendarEventId = bookingData[14] || '';
+
+  // EDGE CASE 1: Check if already cancelled (idempotency)
+  if (status === 'Cancelled' || status === 'Denied') {
+    return res.status(200).send(`
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              max-width: 600px;
+              margin: 50px auto;
+              padding: 20px;
+              text-align: center;
+            }
+            h1 { color: #8B6D7B; }
+          </style>
+        </head>
+        <body>
+          <h1>Booking Already ${status}</h1>
+          <p>This appointment has already been ${status.toLowerCase()}.</p>
+          <p><strong>Client:</strong> ${name}</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Check if status is cancellable
+  const cancellableStatuses = ['pending_deposit', 'confirmed', 'Accepted'];
+  if (!cancellableStatuses.includes(status)) {
+    return res.status(400).send(`
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              max-width: 600px;
+              margin: 50px auto;
+              padding: 20px;
+            }
+            h1 { color: #8B6D7B; }
+          </style>
+        </head>
+        <body>
+          <h1>Cannot Cancel Booking</h1>
+          <p>This booking cannot be cancelled because it has status: ${status}</p>
+          <p><strong>Client:</strong> ${name}</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Handle GET request - show form
+  if (req.method === 'GET') {
+    return res.status(200).send(`
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              max-width: 600px;
+              margin: 50px auto;
+              padding: 20px;
+            }
+            h1 { color: #8B6D7B; }
+            .form-group {
+              margin: 20px 0;
+            }
+            label {
+              display: block;
+              margin-bottom: 8px;
+              font-weight: bold;
+            }
+            textarea {
+              width: 100%;
+              min-height: 100px;
+              padding: 10px;
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              font-family: Arial, sans-serif;
+              font-size: 14px;
+            }
+            .radio-group {
+              margin: 15px 0;
+            }
+            .radio-option {
+              margin: 10px 0;
+              padding: 12px;
+              border: 2px solid #ddd;
+              border-radius: 6px;
+              cursor: pointer;
+              transition: all 0.2s;
+            }
+            .radio-option:hover {
+              border-color: #8B6D7B;
+              background-color: #f9f9f9;
+            }
+            .radio-option input[type="radio"] {
+              margin-right: 10px;
+            }
+            .radio-option label {
+              cursor: pointer;
+              margin: 0;
+              font-weight: normal;
+            }
+            .radio-description {
+              margin-left: 28px;
+              color: #666;
+              font-size: 13px;
+            }
+            button {
+              background-color: #8B6D7B;
+              color: white;
+              padding: 12px 24px;
+              border: none;
+              border-radius: 6px;
+              font-size: 16px;
+              cursor: pointer;
+              font-weight: bold;
+            }
+            button:hover {
+              background-color: #6d5560;
+            }
+            .info {
+              background-color: #f5f5f5;
+              padding: 15px;
+              border-radius: 6px;
+              margin-bottom: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Cancel Appointment</h1>
+
+          <div class="info">
+            <p><strong>Client:</strong> ${name}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Status:</strong> ${status}</p>
+          </div>
+
+          <form method="POST">
+            <input type="hidden" name="token" value="${token}">
+            <div class="form-group">
+              <label for="reason">Cancellation Reason:</label>
+              <textarea
+                id="reason"
+                name="cancellationReason"
+                required
+                placeholder="Enter the reason for cancelling this appointment..."
+              ></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>What should happen to this time slot?</label>
+              <div class="radio-group">
+                <div class="radio-option">
+                  <input type="radio" id="delete" name="slotAvailability" value="delete" checked>
+                  <label for="delete">Let others book in this slot</label>
+                  <div class="radio-description">Calendar event will be deleted, slot becomes available</div>
+                </div>
+                <div class="radio-option">
+                  <input type="radio" id="keep" name="slotAvailability" value="keep">
+                  <label for="keep">Keep slot blocked</label>
+                  <div class="radio-description">Calendar event marked as cancelled, slot stays unavailable</div>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit">Cancel Appointment</button>
+          </form>
+        </body>
+      </html>
+    `);
+  }
+
+  // Handle POST request - process cancellation
+  if (req.method === 'POST') {
+    let body = '';
+
+    await new Promise((resolve) => {
+      req.on('data', chunk => {
+        body += chunk.toString();
+      });
+      req.on('end', resolve);
+    });
+
+    const params = new URLSearchParams(body);
+    const cancellationReason = params.get('cancellationReason');
+    const slotAvailability = params.get('slotAvailability'); // 'delete' or 'keep'
+
+    if (!cancellationReason || cancellationReason.trim() === '') {
+      return res.status(400).send(`
+        <html>
+          <body>
+            <h1>Error</h1>
+            <p>Cancellation reason is required.</p>
+            <a href="?token=${token}">Go back</a>
+          </body>
+        </html>
+      `);
+    }
+
+    const rowNumber = matchingRowIndex + 1;
+    const deleteCalendarEvent = slotAvailability === 'delete';
+
+    // EDGE CASE 4: Re-check status in case of race condition (double-click, multiple tabs)
+    const currentStatusResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `Booking Form!M${rowNumber}`, // Column M = Status
+    });
+
+    const currentStatus = currentStatusResponse.data.values?.[0]?.[0] || '';
+
+    // If already cancelled or denied, return early (race condition prevented)
+    if (currentStatus === 'Cancelled' || currentStatus === 'Denied') {
+      return res.status(200).send(`
+        <html>
+          <head>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                max-width: 600px;
+                margin: 50px auto;
+                padding: 20px;
+                text-align: center;
+              }
+              h1 { color: #8B6D7B; }
+            </style>
+          </head>
+          <body>
+            <h1>Booking Already ${currentStatus}</h1>
+            <p>This appointment has already been ${currentStatus.toLowerCase()}.</p>
+            <p><strong>Client:</strong> ${name}</p>
+          </body>
+        </html>
+      `);
+    }
+
+    // EDGE CASE 2: Delete or update the Calendar event based on user choice
+    const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
+
+    if (calendarEventId) {
+      try {
+        // Check if event exists first
+        await calendar.events.get({
+          calendarId,
+          eventId: calendarEventId,
+        });
+
+        if (deleteCalendarEvent) {
+          // DELETE the event to allow others to book this slot
+          await calendar.events.delete({
+            calendarId,
+            eventId: calendarEventId,
+          });
+          console.log(`Calendar event ${calendarEventId} deleted to allow rebooking`);
+        } else {
+          // PATCH the event to mark as cancelled but keep slot blocked
+          await calendar.events.patch({
+            calendarId,
+            eventId: calendarEventId,
+            requestBody: {
+              summary: '[CANCELLED] Hair Appointment',
+              description: `This appointment was cancelled by the stylist.\n\nClient: ${name}\n\nReason: ${cancellationReason}`,
+            },
+          });
+          console.log(`Calendar event ${calendarEventId} marked as cancelled`);
+        }
+      } catch (calError) {
+        // EDGE CASE 3: Calendar event doesn't exist or can't be updated/deleted
+        if (calError.code === 404) {
+          console.warn(`Calendar event ${calendarEventId} not found, continuing with sheet update`);
+        } else {
+          console.error('Error updating/deleting calendar event:', calError);
+        }
+        // Continue even if calendar operation fails
+      }
+    }
+
+    // Update the Google Sheet status to "Cancelled"
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Booking Form!M${rowNumber}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['Cancelled']],
+      },
+    });
+
+    // Send cancellation email to client
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #8B6D7B;">Appointment Cancellation</h2>
+
+        <p>Hi ${name},</p>
+
+        <p>We're reaching out with some unfortunate news. We sincerely apologize, but we need to cancel your upcoming hair appointment.</p>
+
+        <p><strong>Reason:</strong> ${cancellationReason}</p>
+
+        <p>We understand how disappointing this can be, especially when you've been looking forward to your appointment. Please know this decision wasn't made lightly.</p>
+
+        <h3 style="color: #A8BDA8;">What's Next?</h3>
+
+        <p>We'd love to reschedule with you at a time that works better. You have two options:</p>
+
+        <ul>
+          <li><strong>Book online:</strong> Visit <a href="https://www.hairbydekyi.com" style="color: #8B6D7B;">www.hairbydekyi.com</a> to see our available time slots</li>
+          <li><strong>Message us on Instagram:</strong> <a href="https://instagram.com/hairbydekyi" style="color: #8B6D7B;">@hairbydekyi</a> - we're happy to help you find the perfect time</li>
+        </ul>
+
+        <p>Again, we deeply apologize for any inconvenience this may have caused. We truly value you as a client and hope to see you soon!</p>
+
+        <p style="margin-top: 30px;">
+          Warmly,<br>
+          <strong>Dekyi</strong><br>
+          Hair by Dekyi
+        </p>
+
+        <hr style="border: none; border-top: 1px solid #E8DFD8; margin: 30px 0;">
+
+        <p style="font-size: 12px; color: #7A6A61;">
+          If you have any questions or concerns, please don't hesitate to reach out via Instagram DM.
+        </p>
+      </div>
+    `;
+
+    try {
+      await resend.emails.send({
+        from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+        to: email,
+        subject: 'Appointment Cancellation - We\'re Sorry',
+        html: emailHtml,
+      });
+    } catch (emailError) {
+      console.error('Error sending cancellation email:', emailError);
+    }
+
+    return res.status(200).send(`
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              max-width: 600px;
+              margin: 50px auto;
+              padding: 20px;
+              text-align: center;
+            }
+            h1 { color: #A8BDA8; }
+            .success { color: #6d5560; }
+          </style>
+        </head>
+        <body>
+          <h1>✓ Appointment Cancelled</h1>
+          <p class="success">The appointment for ${name} has been cancelled and they have been notified via email.</p>
+          <p>Reason: ${cancellationReason}</p>
+        </body>
+      </html>
+    `);
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+async function clientCancel(req, res) {
+  const { token } = req.query;
+
+  if (!token) {
+    return res.status(400).send(`
+      <html>
+        <body>
+          <h1>Invalid Request</h1>
+          <p>Missing token parameter.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Authenticate with Google
+  const credentials = JSON.parse(
+    Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8')
+  );
+
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: [
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/calendar',
+    ],
+  });
+
+  const sheets = google.sheets({ version: 'v4', auth });
+  const calendar = google.calendar({ version: 'v3', auth });
+  const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
+
+  // Read all rows to find the matching deposit token
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: 'Booking Form!A:T',
+  });
+
+  const rows = response.data.values;
+  if (!rows || rows.length <= 1) {
+    return res.status(404).send(`
+      <html>
+        <body>
+          <h1>Booking Not Found</h1>
+          <p>No booking found with this token.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Find the row with matching deposit token (Column Q = index 16)
+  let matchingRowIndex = -1;
+  let bookingData = null;
+
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][16] === token) {
+      matchingRowIndex = i;
+      bookingData = rows[i];
+      break;
+    }
+  }
+
+  if (!bookingData) {
+    return res.status(404).send(`
+      <html>
+        <body>
+          <h1>Booking Not Found</h1>
+          <p>Invalid or expired token.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  const name = bookingData[1] || '';
+  const email = bookingData[2] || '';
+  const phone = bookingData[3] || '';
+  const status = bookingData[12] || '';
+  const acceptedSlot = bookingData[13] || '';
+  const calendarEventId = bookingData[14] || '';
+
+  // Check if already cancelled (idempotency)
+  if (status === 'Cancelled' || status === 'Denied') {
+    return res.status(200).send(`
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              max-width: 600px;
+              margin: 50px auto;
+              padding: 20px;
+              text-align: center;
+            }
+            h1 { color: #8B6D7B; }
+          </style>
+        </head>
+        <body>
+          <h1>Appointment Already Cancelled</h1>
+          <p>This appointment has already been cancelled.</p>
+          <p><strong>Client:</strong> ${name}</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Check if status is cancellable
+  const cancellableStatuses = ['pending_deposit', 'confirmed', 'Accepted'];
+  if (!cancellableStatuses.includes(status)) {
+    return res.status(400).send(`
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              max-width: 600px;
+              margin: 50px auto;
+              padding: 20px;
+            }
+            h1 { color: #8B6D7B; }
+          </style>
+        </head>
+        <body>
+          <h1>Cannot Cancel Booking</h1>
+          <p>This booking cannot be cancelled because it has status: ${status}</p>
+          <p>Please contact us directly at hairbydekyi@gmail.com</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Handle GET request - show confirmation form
+  if (req.method === 'GET') {
+    return res.status(200).send(`
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              max-width: 600px;
+              margin: 50px auto;
+              padding: 20px;
+            }
+            h1 { color: #8B6D7B; }
+            .warning {
+              background-color: #fff3cd;
+              border: 1px solid #ffc107;
+              padding: 15px;
+              border-radius: 6px;
+              margin: 20px 0;
+            }
+            .form-group {
+              margin: 20px 0;
+            }
+            label {
+              display: block;
+              margin-bottom: 8px;
+              font-weight: bold;
+            }
+            textarea {
+              width: 100%;
+              min-height: 100px;
+              padding: 10px;
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              font-family: Arial, sans-serif;
+              font-size: 14px;
+            }
+            button {
+              background-color: #d9534f;
+              color: white;
+              padding: 12px 24px;
+              border: none;
+              border-radius: 6px;
+              font-size: 16px;
+              cursor: pointer;
+              font-weight: bold;
+            }
+            button:hover {
+              background-color: #c9302c;
+            }
+            .info {
+              background-color: #f5f5f5;
+              padding: 15px;
+              border-radius: 6px;
+              margin-bottom: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Cancel Your Appointment</h1>
+
+          <div class="info">
+            <p><strong>Your Appointment:</strong></p>
+            <p>${acceptedSlot}</p>
+            <p><strong>Location:</strong> 3073 Parkerhill Rd, Mississauga, ON L5B 1V6</p>
+          </div>
+
+          <div class="warning">
+            <p><strong>⚠️ Are you sure you want to cancel?</strong></p>
+            <p>This action cannot be undone. Your $5 deposit is non-refundable.</p>
+          </div>
+
+          <form method="POST">
+            <input type="hidden" name="token" value="${token}">
+            <div class="form-group">
+              <label for="reason">Please tell us why you're cancelling (optional):</label>
+              <textarea
+                id="reason"
+                name="cancellationReason"
+                placeholder="We'd appreciate knowing why you need to cancel..."
+              ></textarea>
+            </div>
+            <button type="submit">Yes, Cancel My Appointment</button>
+          </form>
+
+          <p style="text-align: center; margin-top: 20px;">
+            <a href="https://www.hairbydekyi.com" style="color: #8B6D7B;">← Back to website</a>
+          </p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Handle POST request - process cancellation
+  if (req.method === 'POST') {
+    let body = '';
+
+    await new Promise((resolve) => {
+      req.on('data', chunk => {
+        body += chunk.toString();
+      });
+      req.on('end', resolve);
+    });
+
+    const params = new URLSearchParams(body);
+    const cancellationReason = params.get('cancellationReason') || 'No reason provided';
+
+    const rowNumber = matchingRowIndex + 1;
+
+    // Re-check status in case of race condition
+    const currentStatusResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: `Booking Form!M${rowNumber}`,
+    });
+
+    const currentStatus = currentStatusResponse.data.values?.[0]?.[0] || '';
+
+    if (currentStatus === 'Cancelled' || currentStatus === 'Denied') {
+      return res.status(200).send(`
+        <html>
+          <head>
+            <style>
+              body {
+                font-family: Arial, sans-serif;
+                max-width: 600px;
+                margin: 50px auto;
+                padding: 20px;
+                text-align: center;
+              }
+              h1 { color: #8B6D7B; }
+            </style>
+          </head>
+          <body>
+            <h1>Already Cancelled</h1>
+            <p>This appointment has already been cancelled.</p>
+          </body>
+        </html>
+      `);
+    }
+
+    // ALWAYS DELETE the calendar event for client cancellations
+    const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
+
+    if (calendarEventId) {
+      try {
+        await calendar.events.delete({
+          calendarId,
+          eventId: calendarEventId,
+        });
+        console.log(`Calendar event ${calendarEventId} deleted (client cancellation)`);
+      } catch (calError) {
+        if (calError.code === 404) {
+          console.warn(`Calendar event ${calendarEventId} not found`);
+        } else {
+          console.error('Error deleting calendar event:', calError);
+        }
+      }
+    }
+
+    // Update the Google Sheet status to "Cancelled"
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Booking Form!M${rowNumber}`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [['Cancelled']],
+      },
+    });
+
+    // Send notification email to DEKYI
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    const slots = [
+      bookingData[4] || '',
+      bookingData[5] || '',
+      bookingData[6] || '',
+    ];
+    const slotNumber = parseInt(acceptedSlot.replace('Slot ', '')) - 1;
+    const selectedSlot = slots[slotNumber] || acceptedSlot;
+
+    await resend.emails.send({
+      from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+      to: 'hairbydekyi@gmail.com',
+      subject: `Client Cancellation: ${name} - ${selectedSlot}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #d9534f;">Client Cancelled Appointment</h2>
+
+          <p>${name} has cancelled their upcoming appointment.</p>
+
+          <h3 style="color: #8B6D7B;">Appointment Details:</h3>
+          <ul>
+            <li><strong>Client:</strong> ${name}</li>
+            <li><strong>Email:</strong> ${email}</li>
+            <li><strong>Phone:</strong> ${phone}</li>
+            <li><strong>Date & Time:</strong> ${selectedSlot}</li>
+          </ul>
+
+          <h3 style="color: #8B6D7B;">Cancellation Details:</h3>
+          <p><strong>Reason:</strong> ${cancellationReason}</p>
+          <p><strong>Cancelled at:</strong> ${new Date().toLocaleString('en-US', { timeZone: 'America/Toronto' })}</p>
+
+          <hr style="border: none; border-top: 1px solid #E8DFD8; margin: 30px 0;">
+
+          <p style="font-size: 12px; color: #7A6A61;">
+            The calendar event has been deleted and this time slot is now available for others to book.
+          </p>
+        </div>
+      `,
+    });
+
+    // Send confirmation email to client
+    await resend.emails.send({
+      from: 'Hair by Dekyi <noreply@hairbydekyi.com>',
+      to: email,
+      subject: 'Appointment Cancelled',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #8B6D7B;">Appointment Cancelled</h2>
+
+          <p>Hi ${name},</p>
+
+          <p>Your appointment for <strong>${selectedSlot}</strong> has been cancelled as requested.</p>
+
+          <p>We're sorry we won't be seeing you this time! If you'd like to reschedule in the future, you're always welcome to book again at <a href="https://www.hairbydekyi.com" style="color: #8B6D7B;">www.hairbydekyi.com</a></p>
+
+          <p>If you have any questions, feel free to reach out to us at hairbydekyi@gmail.com or DM @hairbydekyi on Instagram.</p>
+
+          <p style="margin-top: 30px;">
+            Take care,<br>
+            <strong>Dekyi</strong><br>
+            Hair by Dekyi
+          </p>
+        </div>
+      `,
+    });
+
+    return res.status(200).send(`
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              max-width: 600px;
+              margin: 50px auto;
+              padding: 20px;
+              text-align: center;
+            }
+            h1 { color: #A8BDA8; }
+            .success { color: #6d5560; }
+          </style>
+        </head>
+        <body>
+          <h1>✓ Appointment Cancelled</h1>
+          <p class="success">Your appointment has been cancelled.</p>
+          <p>You should receive a confirmation email shortly.</p>
+          <p style="margin-top: 30px;">
+            <a href="https://www.hairbydekyi.com" style="color: #8B6D7B; font-weight: bold;">← Back to website</a>
+          </p>
+        </body>
+      </html>
+    `);
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }
