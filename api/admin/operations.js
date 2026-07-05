@@ -317,13 +317,21 @@ async function cancelBooking(req, res) {
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
   const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
 
-  // EDGE CASE 1: Read current status to check if already cancelled (idempotency)
-  const currentStatusResponse = await sheets.spreadsheets.values.get({
+  // EDGE CASE 1: Read the booking row to check status (idempotency) and to get
+  // the originally-booked slot time for the cancellation email.
+  const currentRowResponse = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `Booking Form!M${rowIndex}`, // Column M = Status
+    range: `Booking Form!A${rowIndex}:N${rowIndex}`, // through Column N (AcceptedSlot)
   });
 
-  const currentStatus = currentStatusResponse.data.values?.[0]?.[0] || '';
+  const bookingRow = currentRowResponse.data.values?.[0] || [];
+  const currentStatus = bookingRow[12] || ''; // Column M = Status
+
+  // Resolve the originally-booked date/time from the accepted slot.
+  const acceptedSlot = bookingRow[13] || ''; // Column N = AcceptedSlot
+  const rowSlots = [bookingRow[4] || '', bookingRow[5] || '', bookingRow[6] || ''];
+  const acceptedSlotNumber = parseInt(acceptedSlot.replace('Slot ', ''), 10) - 1;
+  const originalSlot = (rowSlots[acceptedSlotNumber] || '').trim();
 
   // If already cancelled or denied, return early (idempotent)
   if (currentStatus === 'Cancelled' || currentStatus === 'Denied') {
@@ -399,11 +407,11 @@ async function cancelBooking(req, res) {
 
       <p>Hi ${clientName},</p>
 
-      <p>We're reaching out with some unfortunate news. We sincerely apologize, but we need to cancel your upcoming hair appointment.</p>
-
+      <p>We apologize, but we need to cancel your upcoming hair appointment.</p>
+${originalSlot ? `
+      <p><strong>Originally booked for:</strong> ${originalSlot}</p>
+` : ''}
       <p><strong>Reason:</strong> ${cancellationReason}</p>
-
-      <p>We understand how disappointing this can be, especially when you've been looking forward to your appointment. Please know this decision wasn't made lightly.</p>
 
       <h3 style="color: #A8BDA8;">What's Next?</h3>
 
@@ -411,7 +419,6 @@ async function cancelBooking(req, res) {
 
       <ul>
         <li><strong>Book online:</strong> Visit <a href="https://www.hairbydekyi.com" style="color: #8B6D7B;">www.hairbydekyi.com</a> to see our available time slots</li>
-        <li><strong>Message us on Instagram:</strong> <a href="https://instagram.com/hairbydekyi" style="color: #8B6D7B;">@hairbydekyi</a> - we're happy to help you find the perfect time</li>
       </ul>
 
       <p>Again, we deeply apologize for any inconvenience this may have caused. We truly value you as a client and hope to see you soon!</p>
@@ -536,6 +543,12 @@ async function cancelWithToken(req, res) {
   const email = bookingData[2] || '';
   const status = bookingData[12] || '';
   const calendarEventId = bookingData[14] || '';
+
+  // Resolve the originally-booked date/time from the accepted slot.
+  const acceptedSlot = bookingData[13] || ''; // Column N = AcceptedSlot
+  const tokenRowSlots = [bookingData[4] || '', bookingData[5] || '', bookingData[6] || ''];
+  const acceptedSlotNumber = parseInt(acceptedSlot.replace('Slot ', ''), 10) - 1;
+  const originalSlot = (tokenRowSlots[acceptedSlotNumber] || '').trim();
 
   // EDGE CASE 1: Check if already cancelled (idempotency)
   if (status === 'Cancelled' || status === 'Denied') {
@@ -831,11 +844,11 @@ async function cancelWithToken(req, res) {
 
         <p>Hi ${name},</p>
 
-        <p>We're reaching out with some unfortunate news. We sincerely apologize, but we need to cancel your upcoming hair appointment.</p>
-
+        <p>We apologize, but we need to cancel your upcoming hair appointment.</p>
+${originalSlot ? `
+        <p><strong>Originally booked for:</strong> ${originalSlot}</p>
+` : ''}
         <p><strong>Reason:</strong> ${cancellationReason}</p>
-
-        <p>We understand how disappointing this can be, especially when you've been looking forward to your appointment. Please know this decision wasn't made lightly.</p>
 
         <h3 style="color: #A8BDA8;">What's Next?</h3>
 
@@ -843,7 +856,6 @@ async function cancelWithToken(req, res) {
 
         <ul>
           <li><strong>Book online:</strong> Visit <a href="https://www.hairbydekyi.com" style="color: #8B6D7B;">www.hairbydekyi.com</a> to see our available time slots</li>
-          <li><strong>Message us on Instagram:</strong> <a href="https://instagram.com/hairbydekyi" style="color: #8B6D7B;">@hairbydekyi</a> - we're happy to help you find the perfect time</li>
         </ul>
 
         <p>Again, we deeply apologize for any inconvenience this may have caused. We truly value you as a client and hope to see you soon!</p>
