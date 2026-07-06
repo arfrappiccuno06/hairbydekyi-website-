@@ -415,7 +415,7 @@ ${originalSlot ? `
 
       <h3 style="color: #A8BDA8;">What's Next?</h3>
 
-      <p>We'd love to reschedule with you at a time that works better. You have two options:</p>
+      <p>We'd love to reschedule with you at a time that works better.</p>
 
       <ul>
         <li><strong>Book online:</strong> Visit <a href="https://www.hairbydekyi.com" style="color: #8B6D7B;">www.hairbydekyi.com</a> to see our available time slots</li>
@@ -852,7 +852,7 @@ ${originalSlot ? `
 
         <h3 style="color: #A8BDA8;">What's Next?</h3>
 
-        <p>We'd love to reschedule with you at a time that works better. You have two options:</p>
+        <p>We'd love to reschedule with you at a time that works better.</p>
 
         <ul>
           <li><strong>Book online:</strong> Visit <a href="https://www.hairbydekyi.com" style="color: #8B6D7B;">www.hairbydekyi.com</a> to see our available time slots</li>
