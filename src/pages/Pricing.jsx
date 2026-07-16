@@ -7,7 +7,7 @@ const Pricing = () => {
         <h1 className="pricing-title">Pricing</h1>
         <div className="pricing-item">
           <h2 className="service-name">At Home Cut n Style</h2>
-          <p className="service-price">$45</p>
+          <p className="service-price">$50</p>
         </div>
         <div className="pricing-divider"></div>
         <p className="pricing-footnote">

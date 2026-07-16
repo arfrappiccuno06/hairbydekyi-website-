@@ -39,7 +39,7 @@ const FAQ = () => {
     },
     {
       question: "What services are offered?",
-      answer: "I offer At Home Cut n Style services for $45. For inquiries on a specific service, DM or email me."
+      answer: "I offer At Home Cut n Style services for $50. For inquiries on a specific service, DM or email me."
     },
     {
       question: "How long does an appointment take?",
