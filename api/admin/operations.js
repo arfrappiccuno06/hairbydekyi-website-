@@ -1163,11 +1163,12 @@ async function clientCancel(req, res) {
             <form method="POST">
               <input type="hidden" name="token" value="${token}">
               <div class="form-group">
-                <label for="reason">Please tell us why you're cancelling (optional):</label>
+                <label for="reason">Please tell us why you're cancelling:</label>
                 <textarea
                   id="reason"
                   name="cancellationReason"
                   placeholder="We'd appreciate knowing why you need to cancel..."
+                  required
                 ></textarea>
               </div>
               <button type="submit">Yes, Cancel My Appointment</button>
@@ -1194,7 +1195,19 @@ async function clientCancel(req, res) {
     });
 
     const params = new URLSearchParams(body);
-    const cancellationReason = params.get('cancellationReason') || 'No reason provided';
+    const cancellationReason = params.get('cancellationReason');
+
+    if (!cancellationReason || cancellationReason.trim() === '') {
+      return res.status(400).send(`
+        <html>
+          <body>
+            <h1>Error</h1>
+            <p>A cancellation reason is required.</p>
+            <a href="?action=client-cancel&token=${token}">Go back</a>
+          </body>
+        </html>
+      `);
+    }
 
     const rowNumber = matchingRowIndex + 1;
 
