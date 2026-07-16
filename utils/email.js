@@ -5,9 +5,15 @@ import { generateToken } from './tokens.js';
 const DEFAULT_FROM = 'Hair by Dekyi <noreply@hairbydekyi.com>';
 const QUEUE_TAB = 'Email Queue';
 
-// Stop retrying a permanently-failing email after this many cron passes so a
-// single bad address can't be retried forever (~20 * 5min cron ≈ 1.5 hours,
-// and well past a daily quota reset).
+// Give up on a queued email once it's older than this. Resend's free-tier
+// 100/day cap is a ROLLING 24h window (a send at 3pm frees its slot at 3pm the
+// next day; over-quota sends return 429 `daily_quota_exceeded`). 48h comfortably
+// outlasts that window, so an email parked because the daily limit was hit keeps
+// getting retried every ~5min and sends the moment its slot ages out.
+const MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+// Fallback give-up used only when a row's queued_at timestamp is missing/unparseable
+// (so a malformed row can't be retried forever). ~20 * 5min cron ≈ 1.5 hours.
 const MAX_ATTEMPTS = 20;
 
 // Cap how many queued emails a single cron pass will try to send, to keep the
@@ -129,7 +135,14 @@ export async function drainEmailQueue(auth) {
       });
       sent++;
     } catch (err) {
-      const newStatus = newAttempts >= MAX_ATTEMPTS ? 'failed' : 'pending';
+      // Keep retrying until the email is older than MAX_AGE_MS so it survives
+      // Resend's rolling 24h daily-quota window. Fall back to the attempt cap
+      // only if queued_at (column A) is missing/unparseable.
+      const queuedAtMs = Date.parse(row[0]);
+      const expired = Number.isNaN(queuedAtMs)
+        ? newAttempts >= MAX_ATTEMPTS
+        : (Date.now() - queuedAtMs) > MAX_AGE_MS;
+      const newStatus = expired ? 'failed' : 'pending';
       // status, attempts, last_error
       updates.push({
         range: `${QUEUE_TAB}!F${rowNumber}:H${rowNumber}`,
