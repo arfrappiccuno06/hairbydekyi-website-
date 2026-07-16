@@ -237,7 +237,7 @@ async function getBookings(req, res) {
   // Fetch all booking data from Booking Form sheet
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Booking Form!A:T',
+    range: 'Booking Form!A:U',
   });
 
   const rows = response.data.values;
@@ -274,6 +274,7 @@ async function getBookings(req, res) {
       depositDeadline: row[17] || '',
       depositReceivedTimestamp: row[18] || '',
       depositScreenshotUrl: row[19] || '',
+      instagramHandle: row[20] || '', // Column U
     };
 
     bookings.push(booking);

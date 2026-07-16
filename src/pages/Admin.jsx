@@ -485,6 +485,7 @@ function Admin() {
                     <div className="booking-details">
                       <p><strong>Email:</strong> {booking.email}</p>
                       <p><strong>Phone:</strong> {booking.phone}</p>
+                      <p><strong>Instagram:</strong> {booking.instagramHandle || 'Not provided'}</p>
                       <p><strong>Submitted:</strong> {booking.timestamp}</p>
 
                       <div className="booking-slots">

@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     // K=Notified, L=Token, M=Status, N=AcceptedSlot, O=CalendarEventId, P=ProcessedTimestamp
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Booking Form!A:T',
+      range: 'Booking Form!A:U',
     });
 
     const rows = response.data.values;
@@ -69,6 +69,7 @@ export default async function handler(req, res) {
       const slot3 = row[6] || '';
       const serviceDescription = row[7] || '';
       const referencePhotos = row[8] || '';
+      const instagramHandle = row[20] || ''; // Column U
 
       // Reference photos come from the Google Form file upload as one or more
       // Drive URLs (comma-separated when multiple). Render each as a link.
@@ -95,6 +96,7 @@ export default async function handler(req, res) {
         <p><strong>Submitted:</strong> ${timestamp}</p>
         <p><strong>Email:</strong> ${email}</p>
         <p><strong>Phone:</strong> ${phone}</p>
+        <p><strong>Instagram:</strong> ${instagramHandle || 'Not provided'}</p>
         <p><strong>Service Description:</strong> ${serviceDescription || 'Not provided'}</p>
         <p><strong>Reference Photos:</strong> ${referencePhotosHtml}</p>
 

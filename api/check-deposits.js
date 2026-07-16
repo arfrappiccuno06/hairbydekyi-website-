@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     // Read Booking Form tab to match deposits
     const bookingsResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Booking Form!A:T',
+      range: 'Booking Form!A:U',
     });
 
     const bookingRows = bookingsResponse.data.values;
@@ -97,6 +97,7 @@ export default async function handler(req, res) {
       const depositDeadline = matchingBooking[17] || ''; // Column R
       const serviceDescription = matchingBooking[7] || '';
       const referencePhotos = matchingBooking[8] || '';
+      const instagramHandle = matchingBooking[20] || ''; // Column U
 
       // Check if deadline has passed
       const now = new Date();
@@ -287,6 +288,7 @@ export default async function handler(req, res) {
                   <li><strong>Client:</strong> ${name}</li>
                   <li><strong>Email:</strong> ${email}</li>
                   <li><strong>Phone:</strong> ${phone}</li>
+                  <li><strong>Instagram:</strong> ${instagramHandle || 'Not provided'}</li>
                   <li><strong>Date & Time:</strong> ${selectedSlot}</li>
                   <li><strong>Status:</strong> Confirmed</li>
                 </ul>
