@@ -229,6 +229,8 @@ export default async function handler(req, res) {
                   <p style="color: #2c2c2c; line-height: 1.6;"><strong>Service:</strong> At Home Cut n Style ($50)</p>
                   <p style="color: #2c2c2c; line-height: 1.6;"><strong>Deposit:</strong> $5 received</p>
 
+                  <p style="color: #2c2c2c; line-height: 1.6;">Hi love!! Make sure to come in with washed clean hair (double shampoo and scrubbing the scalp is a must) before you come:3 also just a heads up since I just starting out I'm doing the cut in my dads workshop LOL😭 there's also visitor parking as soon as you arrive you should see it! As soon as you arrive in the lobby just text me and I'll come get you:3 Also payment is taken in cash:3 I also don't allow any guests just a btw!!</p>
+
                   <p style="margin-top: 30px; color: #2c2c2c; line-height: 1.6;">We look forward to seeing you!</p>
 
                   <p style="color: #2c2c2c; line-height: 1.6;">If you need to make any changes, please contact us directly at <a href="mailto:hairbydekyi@gmail.com" style="color: #7a5566; text-decoration: underline;">hairbydekyi@gmail.com</a> or DM <a href="https://www.instagram.com/hairbydekyi/" style="color: #7a5566; text-decoration: underline;">@hairbydekyi</a> on Instagram.</p>
