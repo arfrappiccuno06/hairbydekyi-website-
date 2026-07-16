@@ -226,7 +226,7 @@ export default async function handler(req, res) {
 
                   <h3 style="color: #7a5566; margin-top: 25px; margin-bottom: 10px;">Appointment Details:</h3>
                   <p style="color: #2c2c2c; line-height: 1.6;"><strong>Date & Time:</strong> ${selectedSlot}</p>
-                  <p style="color: #2c2c2c; line-height: 1.6;"><strong>Location:</strong> 3023 Parkerhill Rd, Mississauga, ON L5B 1V6</p>
+                  <p style="color: #2c2c2c; line-height: 1.6;"><strong>Location:</strong> 3023 Parkerhill Rd, Mississauga, ON L5B 4B3</p>
                   <p style="color: #2c2c2c; line-height: 1.6;"><strong>Service:</strong> At Home Cut n Style ($50)</p>
                   <p style="color: #2c2c2c; line-height: 1.6;"><strong>Deposit:</strong> $5 received</p>
 
