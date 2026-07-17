@@ -40,7 +40,7 @@ export default async function handler(req, res) {
     // Read Booking Form tab to match deposits
     const bookingsResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Booking Form!A:U',
+      range: 'Booking Form!A:Z',
     });
 
     const bookingRows = bookingsResponse.data.values;
@@ -48,6 +48,13 @@ export default async function handler(req, res) {
     if (!bookingRows || bookingRows.length <= 1) {
       return res.status(200).json({ message: 'No bookings found' });
     }
+
+    // Find the Instagram column by its header name instead of a hardcoded index,
+    // so the email keeps working even if the Google Form shifts the column.
+    const bookingHeaders = bookingRows[0] || [];
+    const instagramColIndex = bookingHeaders.findIndex(
+      (h) => String(h || '').toLowerCase().includes('instagram')
+    );
 
     let depositsProcessed = 0;
     const processedDeposits = [];
@@ -97,7 +104,7 @@ export default async function handler(req, res) {
       const depositDeadline = matchingBooking[17] || ''; // Column R
       const serviceDescription = matchingBooking[7] || '';
       const referencePhotos = matchingBooking[8] || '';
-      const instagramHandle = matchingBooking[20] || ''; // Column U
+      const instagramHandle = (instagramColIndex >= 0 ? matchingBooking[instagramColIndex] : '') || '';
 
       // Check if deadline has passed
       const now = new Date();

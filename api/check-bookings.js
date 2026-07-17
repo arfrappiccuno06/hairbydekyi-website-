@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     // K=Notified, L=Token, M=Status, N=AcceptedSlot, O=CalendarEventId, P=ProcessedTimestamp
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Booking Form!A:U',
+      range: 'Booking Form!A:Z',
     });
 
     const rows = response.data.values;
@@ -36,6 +36,9 @@ export default async function handler(req, res) {
     // First row is headers
     const headers = rows[0];
     const notifiedColumnIndex = headers.indexOf('Notified');
+    const instagramColIndex = headers.findIndex(
+      (h) => String(h || '').toLowerCase().includes('instagram')
+    );
 
     // If "Notified" column doesn't exist, we need to add it
     if (notifiedColumnIndex === -1) {
@@ -69,7 +72,7 @@ export default async function handler(req, res) {
       const slot3 = row[6] || '';
       const serviceDescription = row[7] || '';
       const referencePhotos = row[8] || '';
-      const instagramHandle = row[20] || ''; // Column U
+      const instagramHandle = (instagramColIndex >= 0 ? row[instagramColIndex] : '') || '';
 
       // Reference photos come from the Google Form file upload as one or more
       // Drive URLs (comma-separated when multiple). Render each as a link.
