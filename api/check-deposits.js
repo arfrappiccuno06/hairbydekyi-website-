@@ -151,6 +151,7 @@ export default async function handler(req, res) {
             `Client: ${name}`,
             `Email: ${email}`,
             `Phone: ${phone}`,
+            `Instagram: ${instagramHandle || 'Not provided'}`,
             `\nService Description: ${serviceDescription}`,
             `\nReference Photos: ${referencePhotos || 'NOT PROVIDED'}`,
             `\nDeposit Screenshot: ${depositScreenshot}`,

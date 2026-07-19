@@ -54,7 +54,7 @@ export default async function handler(req, res) {
     // Read all rows to find the matching token
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Booking Form!A:T',
+      range: 'Booking Form!A:Z',
     });
 
     const rows = response.data.values;
@@ -103,6 +103,12 @@ export default async function handler(req, res) {
     ];
     const serviceDescription = bookingData[7] || ''; // Column H
     const referencePhotos = bookingData[8] || ''; // Column I
+    // Find the Instagram column by header name (not a fixed index) so it keeps
+    // working if the Google Form shifts the column.
+    const instagramColIndex = rows[0].findIndex(
+      (h) => String(h || '').toLowerCase().includes('instagram')
+    );
+    const instagramHandle = (instagramColIndex >= 0 ? bookingData[instagramColIndex] : '') || '';
     const status = bookingData[12] || ''; // Column M
 
     // Idempotency check
@@ -267,6 +273,7 @@ export default async function handler(req, res) {
       `Client: ${name}`,
       `Email: ${email}`,
       `Phone: ${phone}`,
+      `Instagram: ${instagramHandle || 'Not provided'}`,
       `\nService Description: ${serviceDescription}`,
       `\nReference Photos: ${referencePhotos || 'NOT PROVIDED'}`,
       `\nDeposit deadline: 24 hours from acceptance`,
