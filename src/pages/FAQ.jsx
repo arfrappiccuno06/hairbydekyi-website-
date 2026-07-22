@@ -47,7 +47,7 @@ const FAQ = () => {
     },
     {
       question: "What payment methods are accepted?",
-      answer: "For the deposit, I accept e-transfer. For final payment, I accept either e-transfer or cash. You'll receive e-transfer details in your confirmation email."
+      answer: "For the deposit, I accept e-transfer. You'll receive e-transfer details in your confirmation email. For final payment (total payment - deposit), I accept just cash."
     }
   ];
 
