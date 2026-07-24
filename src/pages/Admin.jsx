@@ -14,6 +14,7 @@ function Admin() {
   const [activeTab, setActiveTab] = useState('schedule');
   const [schedule, setSchedule] = useState({});
   const [bookings, setBookings] = useState([]);
+  const [bookingSearch, setBookingSearch] = useState('');
   const [selectedDate, setSelectedDate] = useState(null);
   const [editingSlots, setEditingSlots] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -368,6 +369,26 @@ function Admin() {
     );
   }
 
+  // Filter bookings by name and/or date. Each whitespace-separated term must
+  // appear somewhere in the client's name, submitted date, or slot dates, so
+  // "sara" matches by name, "june 16" by date, and "sara 16" by both.
+  const filteredBookings = bookings.filter((booking) => {
+    const query = bookingSearch.trim().toLowerCase();
+    if (!query) return true;
+    const haystack = [
+      booking.name,
+      booking.timestamp,
+      booking.slot1,
+      booking.slot2,
+      booking.slot3,
+      booking.acceptedSlot,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return query.split(/\s+/).every((term) => haystack.includes(term));
+  });
+
   // Admin Dashboard
   return (
     <div className="app admin-app">
@@ -471,9 +492,20 @@ function Admin() {
                 </button>
               </div>
 
+              <input
+                type="text"
+                className="bookings-search-input"
+                placeholder="Search by name or date (e.g. Sara, June 16)"
+                value={bookingSearch}
+                onChange={(e) => setBookingSearch(e.target.value)}
+              />
+
               <div className="bookings-list">
                 {bookings.length === 0 && <p className="no-bookings">No bookings found</p>}
-                {bookings.map((booking, index) => (
+                {bookings.length > 0 && filteredBookings.length === 0 && (
+                  <p className="no-bookings">No bookings match your search</p>
+                )}
+                {filteredBookings.map((booking, index) => (
                   <div key={index} className={`booking-card status-${booking.status.toLowerCase()}`}>
                     <div className="booking-header">
                       <h3 className="booking-name">{booking.name}</h3>
