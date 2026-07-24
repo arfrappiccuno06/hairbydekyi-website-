@@ -15,11 +15,13 @@ const Calendar = ({ selectedDate, onDateSelect, selectedSlots, availability, loa
       timeZone: 'America/Toronto',
       year: 'numeric',
       month: 'numeric',
+      day: 'numeric',
     });
     const torontoParts = torontoFormatter.formatToParts(nowUTC);
     const torontoYear = parseInt(torontoParts.find(p => p.type === 'year').value);
     const torontoMonth = parseInt(torontoParts.find(p => p.type === 'month').value) - 1; // 0-indexed
-    return { year: torontoYear, month: torontoMonth };
+    const torontoDay = parseInt(torontoParts.find(p => p.type === 'day').value);
+    return { year: torontoYear, month: torontoMonth, day: torontoDay };
   };
 
   const getDaysInMonth = (date) => {
@@ -43,17 +45,22 @@ const Calendar = ({ selectedDate, onDateSelect, selectedSlots, availability, loa
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
 
-  // Check if viewing a future month
-  const currentTorontoMonth = getCurrentTorontoMonth();
-  const isFutureMonth =
-    year > currentTorontoMonth.year ||
-    (year === currentTorontoMonth.year && month > currentTorontoMonth.month);
+  // A month opens for booking 5 days before it starts.
+  const BOOKING_LEAD_DAYS = 5;
+  const monthOpenDate = new Date(year, month, 1 - BOOKING_LEAD_DAYS);
 
-  // Calculate last day of previous month for the message
-  const getLastDayOfPreviousMonth = () => {
-    const prevMonthDate = new Date(year, month - 1);
-    const lastDay = new Date(year, month, 0).getDate();
-    return `${MONTHS[prevMonthDate.getMonth()]} ${lastDay}`;
+  // Block the viewed month only while today (Toronto) is before its open date.
+  const currentTorontoMonth = getCurrentTorontoMonth();
+  const todayToronto = new Date(
+    currentTorontoMonth.year,
+    currentTorontoMonth.month,
+    currentTorontoMonth.day
+  );
+  const isFutureMonth = todayToronto < monthOpenDate;
+
+  // Date the viewed month's bookings open, for the "not yet open" message.
+  const getOpenDateLabel = () => {
+    return `${MONTHS[monthOpenDate.getMonth()]} ${monthOpenDate.getDate()}`;
   };
 
   const prevMonth = () => {
@@ -152,7 +159,7 @@ const Calendar = ({ selectedDate, onDateSelect, selectedSlots, availability, loa
       ) : isFutureMonth ? (
         <div className="calendar-future-month-message">
           <p className="future-month-text">
-            {MONTHS[month]} bookings will open {getLastDayOfPreviousMonth()}
+            {MONTHS[month]} bookings will open {getOpenDateLabel()}
           </p>
         </div>
       ) : (
