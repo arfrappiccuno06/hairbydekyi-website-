@@ -2,8 +2,14 @@ import { google } from 'googleapis';
 import { fetchSchedule, findSlotByTime } from '../utils/schedule.js';
 import { generateToken } from '../utils/tokens.js';
 import { sendEmail } from '../utils/email.js';
+import { rateLimit } from '../utils/security.js';
 
 export default async function handler(req, res) {
+  // Defense-in-depth: the token is an unguessable UUID, but this caps the rate
+  // of any brute-force attempt. Renders an HTML notice since the stylist opens
+  // this URL directly from the notification email.
+  if (!rateLimit(req, res, { name: 'accept', limit: 20, windowMs: 60 * 60 * 1000, format: 'html' })) return;
+
   try {
     // Parse query parameters
     const { token, slot } = req.query;

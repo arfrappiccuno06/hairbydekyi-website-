@@ -1,7 +1,12 @@
 import { google } from 'googleapis';
 import { sendEmail } from '../utils/email.js';
+import { rateLimit } from '../utils/security.js';
 
 export default async function handler(req, res) {
+  // Defense-in-depth: caps brute-force rate against the UUID token. HTML notice
+  // since this URL is opened directly from the notification email.
+  if (!rateLimit(req, res, { name: 'deny', limit: 20, windowMs: 60 * 60 * 1000, format: 'html' })) return;
+
   try {
     // Parse query parameter
     const { token } = req.query;

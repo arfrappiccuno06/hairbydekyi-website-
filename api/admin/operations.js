@@ -1,12 +1,21 @@
 import { google } from 'googleapis';
 import { getSessionFromCookie, verifySessionToken } from '../../utils/auth.js';
 import { sendEmail } from '../../utils/email.js';
+import { rateLimit } from '../../utils/security.js';
 
 export default async function handler(req, res) {
   const { action } = req.query;
 
   if (!action) {
     return res.status(400).json({ error: 'Action parameter is required' });
+  }
+
+  // The token-based actions (client-cancel, cancel-with-token) are publicly
+  // reachable without a session, so throttle them. Session-gated actions below
+  // are already protected by the admin auth cookie and are left unlimited so
+  // the admin panel's own calls are never blocked.
+  if (action === 'cancel-with-token' || action === 'client-cancel') {
+    if (!rateLimit(req, res, { name: 'public-cancel', limit: 20, windowMs: 60 * 60 * 1000, format: 'html' })) return;
   }
 
   // Skip auth for token-based actions (uses token-based auth instead)

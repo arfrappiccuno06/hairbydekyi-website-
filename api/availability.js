@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { fetchSchedule, getSlotConfigForDate } from '../utils/schedule.js';
+import { rateLimit } from '../utils/security.js';
 
 // Cache for calendar data (5 minutes)
 let cache = {
@@ -20,6 +21,10 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Throttle abusive clients (in-memory, best-effort — see utils/security.js).
+  // CORS headers are already set above, so the 429 is readable by the browser.
+  if (!rateLimit(req, res, { name: 'availability', limit: 60, windowMs: 60 * 60 * 1000 })) return;
 
   try {
     const { year, month } = req.query;

@@ -6,6 +6,7 @@ import {
   getSessionFromCookie,
   verifySessionToken
 } from '../../utils/auth.js';
+import { rateLimit } from '../../utils/security.js';
 
 export default async function handler(req, res) {
   const { action } = req.query;
@@ -38,6 +39,11 @@ async function handleLogin(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Rate-limit login attempts to blunt password brute-forcing. Only the login
+  // action is throttled — 'verify' runs on every admin page load and must not
+  // be blocked.
+  if (!rateLimit(req, res, { name: 'admin-login', limit: 10, windowMs: 15 * 60 * 1000 })) return;
 
   const { password } = req.body;
 
