@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 
-const SECRET_KEY = process.env.AUTH_SECRET || 'hairbydekyi-admin-secret-2026';
+// No hardcoded fallback: the signing key MUST come from the environment. A
+// committed default would let anyone who reads the repo forge admin sessions.
+const SECRET_KEY = process.env.AUTH_SECRET;
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 /**
@@ -8,6 +10,9 @@ const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
  * @returns {string} Signed session token
  */
 export function generateSessionToken() {
+  if (!SECRET_KEY) {
+    throw new Error('AUTH_SECRET is not configured');
+  }
   const timestamp = Date.now();
   const signature = crypto
     .createHmac('sha256', SECRET_KEY)
@@ -23,7 +28,8 @@ export function generateSessionToken() {
  * @returns {boolean} True if valid and not expired
  */
 export function verifySessionToken(token) {
-  if (!token) return false;
+  // Fail closed if the signing key isn't configured (no forged sessions).
+  if (!SECRET_KEY || !token) return false;
 
   try {
     const [timestamp, signature] = token.split('.');
@@ -89,6 +95,8 @@ export function getSessionFromCookie(cookieHeader) {
  * @returns {boolean} True if password is correct
  */
 export function verifyAdminPassword(password) {
-  const adminPassword = process.env.ADMIN_PASSWORD || 'arfasthebest420';
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  // Fail closed if no password is configured, and never accept an empty one.
+  if (!adminPassword) return false;
   return password === adminPassword;
 }

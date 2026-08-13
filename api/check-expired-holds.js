@@ -157,7 +157,6 @@ export default async function handler(req, res) {
     console.error('Error checking expired holds:', error);
     return res.status(500).json({
       error: 'Failed to check expired holds',
-      details: error.message,
     });
   }
 }

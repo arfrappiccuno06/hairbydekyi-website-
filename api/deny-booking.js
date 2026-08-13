@@ -166,7 +166,7 @@ export default async function handler(req, res) {
       <html>
         <body>
           <h1>Error</h1>
-          <p>Failed to deny booking: ${error.message}</p>
+          <p>Something went wrong while processing this request. Please try again, or DM us on Instagram if it keeps happening.</p>
         </body>
       </html>
     `);

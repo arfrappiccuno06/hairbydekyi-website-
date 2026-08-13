@@ -199,7 +199,6 @@ export default async function handler(req, res) {
     console.error('Error checking bookings:', error);
     return res.status(500).json({
       error: 'Failed to check bookings',
-      details: error.message,
     });
   }
 }

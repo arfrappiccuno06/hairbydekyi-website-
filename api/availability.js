@@ -140,8 +140,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Calendar API Error:', error);
     return res.status(500).json({
-      error: 'Failed to fetch availability',
-      message: error.message
+      error: 'Failed to fetch availability'
     });
   }
 }

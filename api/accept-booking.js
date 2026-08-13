@@ -434,7 +434,6 @@ export default async function handler(req, res) {
             <p>The booking was accepted and the calendar hold was created, but we failed to send the deposit request email.</p>
             <p><strong>Client:</strong> ${name}</p>
             <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Error:</strong> ${emailResponse.error.message}</p>
             <p style="margin-top: 20px; color: #d9534f;"><strong>ACTION REQUIRED:</strong> Please contact the client directly to request their deposit. The calendar hold will expire in 24 hours if not received.</p>
           </body>
         </html>
@@ -461,7 +460,7 @@ export default async function handler(req, res) {
       <html>
         <body>
           <h1>Error</h1>
-          <p>Failed to accept booking: ${error.message}</p>
+          <p>Something went wrong while processing this request. Please try again, or DM us on Instagram if it keeps happening.</p>
         </body>
       </html>
     `);

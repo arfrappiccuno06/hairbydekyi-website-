@@ -50,7 +50,6 @@ export default async function handler(req, res) {
     console.error('Admin operations error:', error);
     return res.status(500).json({
       error: 'Operation failed',
-      details: error.message,
     });
   }
 }
@@ -467,7 +466,6 @@ ${originalSlot ? `
     return res.status(200).json({
       success: true,
       message: 'Booking cancelled but email failed to send',
-      emailError: emailError.message,
     });
   }
 
