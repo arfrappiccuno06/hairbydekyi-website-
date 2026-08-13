@@ -151,3 +151,35 @@ export function rateLimit(req, res, { name, limit, windowMs, format = 'json' }) 
 
   return true;
 }
+
+/**
+ * True if `value` is a canonical UUID (versions 1–5). Every booking and deposit
+ * token is generated with crypto.randomUUID() (v4), so anything that is not a
+ * well-formed UUID cannot be a real token — reject it BEFORE it is ever used in
+ * a Google Sheet lookup (keeps attacker-controlled junk out of the matching
+ * logic and avoids wasting a Sheets API call on obviously-invalid input).
+ */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export function isUuid(value) {
+  return typeof value === 'string' && UUID_RE.test(value);
+}
+
+/**
+ * Coerce a value that must be a positive integer (e.g. a spreadsheet row number
+ * interpolated into an A1 range like `Booking Form!M${row}`). Returns the
+ * integer, or null if the value is not a clean positive integer.
+ */
+export function toPositiveInt(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+/**
+ * Coerce a value that must be an integer within [min, max] (e.g. a calendar
+ * year or month from a query string). Returns the integer, or null if invalid.
+ */
+export function toIntInRange(value, min, max) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= min && n <= max ? n : null;
+}

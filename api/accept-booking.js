@@ -2,7 +2,7 @@ import { google } from 'googleapis';
 import { fetchSchedule, findSlotByTime } from '../utils/schedule.js';
 import { generateToken } from '../utils/tokens.js';
 import { sendEmail } from '../utils/email.js';
-import { rateLimit } from '../utils/security.js';
+import { rateLimit, isUuid } from '../utils/security.js';
 
 export default async function handler(req, res) {
   // Defense-in-depth: the token is an unguessable UUID, but this caps the rate
@@ -20,6 +20,18 @@ export default async function handler(req, res) {
           <body>
             <h1>Invalid Request</h1>
             <p>Missing token or slot parameter.</p>
+          </body>
+        </html>
+      `);
+    }
+
+    // Reject anything that isn't a well-formed UUID before touching the Sheet.
+    if (!isUuid(token)) {
+      return res.status(400).send(`
+        <html>
+          <body>
+            <h1>Invalid Request</h1>
+            <p>This link is invalid or has expired.</p>
           </body>
         </html>
       `);

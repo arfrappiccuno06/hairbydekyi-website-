@@ -1,7 +1,7 @@
 import { google } from 'googleapis';
 import { getSessionFromCookie, verifySessionToken } from '../../utils/auth.js';
 import { sendEmail } from '../../utils/email.js';
-import { rateLimit } from '../../utils/security.js';
+import { rateLimit, isUuid, toPositiveInt } from '../../utils/security.js';
 
 export default async function handler(req, res) {
   const { action } = req.query;
@@ -309,6 +309,13 @@ async function cancelBooking(req, res) {
     });
   }
 
+  // rowIndex is interpolated into A1 ranges (e.g. `Booking Form!M${rowIndex}`),
+  // so it must be a clean positive integer. Reject anything else generically.
+  const safeRowIndex = toPositiveInt(rowIndex);
+  if (safeRowIndex === null) {
+    return res.status(400).json({ error: 'Invalid request' });
+  }
+
   // Authenticate with Google
   const credentials = JSON.parse(
     Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8')
@@ -331,7 +338,7 @@ async function cancelBooking(req, res) {
   // the originally-booked slot time for the cancellation email.
   const currentRowResponse = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `Booking Form!A${rowIndex}:N${rowIndex}`, // through Column N (AcceptedSlot)
+    range: `Booking Form!A${safeRowIndex}:N${safeRowIndex}`, // through Column N (AcceptedSlot)
   });
 
   const bookingRow = currentRowResponse.data.values?.[0] || [];
@@ -403,7 +410,7 @@ async function cancelBooking(req, res) {
   // Update the Google Sheet status to "Cancelled"
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `Booking Form!M${rowIndex}`, // Column M = Status
+    range: `Booking Form!M${safeRowIndex}`, // Column M = Status
     valueInputOption: 'RAW',
     requestBody: {
       values: [['Cancelled']],
@@ -486,6 +493,18 @@ async function cancelWithToken(req, res) {
         <body>
           <h1>Invalid Request</h1>
           <p>Missing token parameter.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Reject anything that isn't a well-formed UUID before touching the Sheet.
+  if (!isUuid(token)) {
+    return res.status(400).send(`
+      <html>
+        <body>
+          <h1>Invalid Request</h1>
+          <p>This link is invalid or has expired.</p>
         </body>
       </html>
     `);
@@ -931,6 +950,18 @@ async function clientCancel(req, res) {
         <body>
           <h1>Invalid Request</h1>
           <p>Missing token parameter.</p>
+        </body>
+      </html>
+    `);
+  }
+
+  // Reject anything that isn't a well-formed UUID before touching the Sheet.
+  if (!isUuid(token)) {
+    return res.status(400).send(`
+      <html>
+        <body>
+          <h1>Invalid Request</h1>
+          <p>This link is invalid or has expired.</p>
         </body>
       </html>
     `);

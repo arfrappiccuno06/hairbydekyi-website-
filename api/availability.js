@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { fetchSchedule, getSlotConfigForDate } from '../utils/schedule.js';
-import { rateLimit } from '../utils/security.js';
+import { rateLimit, toIntInRange } from '../utils/security.js';
 
 // Cache for calendar data (5 minutes)
 let cache = {
@@ -33,8 +33,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Year and month are required' });
     }
 
-    // Check cache
-    const cacheKey = `${year}-${month}`;
+    // Validate year/month are integers in a sane range BEFORE any date math or
+    // Google API calls. Reject malformed input with a generic message.
+    const yearNum = toIntInRange(year, 2020, 2100);
+    const monthNum = toIntInRange(month, 1, 12);
+    if (yearNum === null || monthNum === null) {
+      return res.status(400).json({ error: 'Invalid year or month' });
+    }
+
+    // Check cache (normalized numeric key so "09" and "9" don't split the cache)
+    const cacheKey = `${yearNum}-${monthNum}`;
     const now = Date.now();
     if (cache.data && cache.key === cacheKey && (now - cache.timestamp) < cache.ttl) {
       return res.status(200).json(cache.data);
@@ -57,8 +65,8 @@ export default async function handler(req, res) {
     const calendarId = process.env.GOOGLE_CALENDAR_ID;
 
     // Get start and end of month
-    const startOfMonth = new Date(year, month - 1, 1);
-    const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+    const startOfMonth = new Date(yearNum, monthNum - 1, 1);
+    const endOfMonth = new Date(yearNum, monthNum, 0, 23, 59, 59);
 
     // Fetch schedule (Google Sheets) and events (Google Calendar) in parallel.
     // Neither depends on the other's result, so running them concurrently
