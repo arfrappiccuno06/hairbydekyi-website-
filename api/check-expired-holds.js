@@ -1,7 +1,11 @@
 import { google } from 'googleapis';
 import { sendEmail } from '../utils/email.js';
+import { requireCron } from '../utils/security.js';
 
 export default async function handler(req, res) {
+  // Cron-only endpoint: reject callers without the shared CRON_SECRET.
+  if (!requireCron(req, res)) return;
+
   try {
     // Decode the service account credentials
     const credentials = JSON.parse(
