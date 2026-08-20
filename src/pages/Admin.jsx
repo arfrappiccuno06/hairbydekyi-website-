@@ -5,6 +5,27 @@ import '../styles/Admin.css';
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+// Human-readable labels for the raw status strings stored in the Sheet.
+const STATUS_LABELS = {
+  pending_acceptance: 'Needs Response',
+  pending_deposit: 'Awaiting Deposit',
+  confirmed: 'Confirmed',
+  conflict: 'All Slots Taken',
+  expired: 'Expired',
+  cancelled: 'Cancelled',
+  denied: 'Denied',
+  accepted: 'Accepted',
+};
+
+// Labels for a slot's live availability (from get-slot-availability).
+const AVAIL_LABELS = {
+  available: 'Available',
+  taken: 'Taken',
+  past: 'Past',
+  unknown: 'Tap to check',
+  checking: 'Checking…',
+};
+
 function Admin() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -19,6 +40,7 @@ function Admin() {
   const [editingSlots, setEditingSlots] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [availabilityMap, setAvailabilityMap] = useState({});
+  const [slotAvailability, setSlotAvailability] = useState({});
 
   // Check authentication on mount
   useEffect(() => {
@@ -32,10 +54,11 @@ function Admin() {
     }
   }, [isAuthenticated, activeTab]);
 
-  // Load bookings when switching to bookings tab
+  // Load bookings (and live slot availability) when switching to bookings tab
   useEffect(() => {
     if (isAuthenticated && activeTab === 'bookings') {
       fetchBookings();
+      fetchSlotAvailability();
     }
   }, [isAuthenticated, activeTab]);
 
@@ -150,6 +173,21 @@ function Admin() {
       setBookings(data.bookings || []);
     } catch (error) {
       console.error('Error fetching bookings:', error);
+    }
+  };
+
+  // Live per-slot availability for pending bookings so taken/past slots can be
+  // greyed out. Best-effort: on failure slots stay "tap to check" and remain
+  // clickable (the accept link does the authoritative check anyway).
+  const fetchSlotAvailability = async () => {
+    try {
+      const response = await fetch('/api/admin/operations?action=get-slot-availability', {
+        credentials: 'include',
+      });
+      const data = await response.json();
+      setSlotAvailability(data.availability || {});
+    } catch (error) {
+      console.error('Error fetching slot availability:', error);
     }
   };
 
@@ -487,7 +525,10 @@ function Admin() {
             <div className="admin-bookings-section">
               <div className="bookings-header">
                 <h2 className="bookings-title">All Bookings</h2>
-                <button onClick={fetchBookings} className="refresh-button">
+                <button
+                  onClick={() => { fetchBookings(); fetchSlotAvailability(); }}
+                  className="refresh-button"
+                >
                   Refresh
                 </button>
               </div>
@@ -505,12 +546,20 @@ function Admin() {
                 {bookings.length > 0 && filteredBookings.length === 0 && (
                   <p className="no-bookings">No bookings match your search</p>
                 )}
-                {filteredBookings.map((booking, index) => (
-                  <div key={index} className={`booking-card status-${booking.status.toLowerCase()}`}>
+                {filteredBookings.map((booking, index) => {
+                  const statusKey = (booking.status || 'pending_acceptance').toLowerCase();
+                  const statusClass = statusKey === 'pending_acceptance' ? 'pending' : statusKey;
+                  const statusLabel = STATUS_LABELS[statusKey] || booking.status || 'Pending';
+                  const isPending = booking.status === 'pending_acceptance';
+                  const slots = [booking.slot1, booking.slot2, booking.slot3];
+                  const avail = slotAvailability[booking.rowIndex] || {};
+
+                  return (
+                  <div key={index} className={`booking-card status-${statusClass}`}>
                     <div className="booking-header">
                       <h3 className="booking-name">{booking.name}</h3>
-                      <span className={`booking-status status-${booking.status.toLowerCase()}`}>
-                        {booking.status || 'Pending'}
+                      <span className={`booking-status status-${statusClass}`}>
+                        {statusLabel}
                       </span>
                     </div>
 
@@ -520,14 +569,71 @@ function Admin() {
                       <p><strong>Instagram:</strong> {booking.instagramHandle || 'Not provided'}</p>
                       <p><strong>Submitted:</strong> {booking.timestamp}</p>
 
-                      <div className="booking-slots">
-                        <p><strong>Slot Options:</strong></p>
-                        <ul>
-                          {booking.slot1 && <li>{booking.slot1}</li>}
-                          {booking.slot2 && <li>{booking.slot2}</li>}
-                          {booking.slot3 && <li>{booking.slot3}</li>}
-                        </ul>
-                      </div>
+                      {isPending ? (
+                        <div className="pending-actions">
+                          <p className="pending-actions-title"><strong>Accept a time slot:</strong></p>
+                          <div className="pending-slots">
+                            {slots.map((slot, i) => {
+                              if (!slot) return null;
+                              const status = avail[`slot${i + 1}`] || 'checking';
+                              const blocked = status === 'taken' || status === 'past';
+                              return (
+                                <div key={i} className={`pending-slot avail-${status}`}>
+                                  <div className="pending-slot-info">
+                                    <span className="pending-slot-time">{slot}</span>
+                                    <span className={`avail-badge avail-${status}`}>
+                                      {AVAIL_LABELS[status] || ''}
+                                    </span>
+                                  </div>
+                                  {blocked ? (
+                                    <button
+                                      className="slot-accept-btn disabled"
+                                      disabled
+                                      title={status === 'past' ? 'This slot has already passed' : 'This slot is already booked'}
+                                    >
+                                      Accept
+                                    </button>
+                                  ) : (
+                                    <a
+                                      className="slot-accept-btn"
+                                      href={`/api/accept-booking?token=${booking.token}&slot=${i}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      Accept
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <a
+                            className="deny-booking-button"
+                            href={`/api/deny-booking?token=${booking.token}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              if (!confirm(`Deny ${booking.name}'s request? They'll be emailed a polite rejection.`)) {
+                                e.preventDefault();
+                              }
+                            }}
+                          >
+                            Deny booking
+                          </a>
+                          <p className="pending-actions-note">
+                            Opens in a new tab. Come back and tap <strong>Refresh</strong> to update the status.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="booking-slots">
+                          <p><strong>Slot Options:</strong></p>
+                          <ul>
+                            {booking.slot1 && <li>{booking.slot1}</li>}
+                            {booking.slot2 && <li>{booking.slot2}</li>}
+                            {booking.slot3 && <li>{booking.slot3}</li>}
+                          </ul>
+                        </div>
+                      )}
 
                       {booking.acceptedSlot && (
                         <p className="accepted-slot"><strong>Accepted Slot:</strong> {booking.acceptedSlot}</p>
@@ -552,7 +658,8 @@ function Admin() {
                       </button>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

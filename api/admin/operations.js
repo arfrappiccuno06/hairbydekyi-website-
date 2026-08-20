@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { getSessionFromCookie, verifySessionToken } from '../../utils/auth.js';
 import { sendEmail } from '../../utils/email.js';
 import { rateLimit, isUuid, toPositiveInt } from '../../utils/security.js';
+import { fetchSchedule, parseSlotString } from '../../utils/schedule.js';
 
 export default async function handler(req, res) {
   const { action } = req.query;
@@ -37,6 +38,8 @@ export default async function handler(req, res) {
         return await updateSchedule(req, res);
       case 'get-bookings':
         return await getBookings(req, res);
+      case 'get-slot-availability':
+        return await getSlotAvailability(req, res);
       case 'cancel-booking':
         return await cancelBooking(req, res);
       case 'cancel-with-token':
@@ -292,6 +295,108 @@ async function getBookings(req, res) {
   bookings.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   return res.status(200).json({ bookings });
+}
+
+/**
+ * Live availability for every slot of every booking still awaiting the stylist's
+ * response (status = pending_acceptance). Lets the dashboard grey out slots that
+ * are already taken or in the past BEFORE she clicks, so she never has to open a
+ * dead booking to discover all three options are gone.
+ *
+ * Returns { availability: { [rowIndex]: { slot1|slot2|slot3: status } } } where
+ * status is one of: 'available' | 'taken' | 'past' | 'unknown'. Empty slots are
+ * simply omitted. Only pending_acceptance rows are checked, so the number of
+ * calendar look-ups stays tiny for a solo stylist.
+ */
+async function getSlotAvailability(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const credentials = JSON.parse(
+    Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8')
+  );
+
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: [
+      'https://www.googleapis.com/auth/spreadsheets.readonly',
+      'https://www.googleapis.com/auth/calendar.readonly',
+    ],
+  });
+
+  const sheets = google.sheets({ version: 'v4', auth });
+  const calendar = google.calendar({ version: 'v3', auth });
+  const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID || '1mNaPRaHr_HwFVY-Szxak-QCZwWDJ-BWO0E4tBc1f-NA';
+  const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
+
+  // Slot durations come from the Schedule tab (parseSlotString falls back to 90m).
+  const schedule = await fetchSchedule(auth);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: 'Booking Form!A:U',
+  });
+
+  const rows = response.data.values;
+  if (!rows || rows.length <= 1) {
+    return res.status(200).json({ availability: {} });
+  }
+
+  const now = Date.now();
+  const availability = {};
+  const busyChecks = []; // slots that still need a calendar free/busy look-up
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[12] || '') !== 'pending_acceptance') continue; // Column M = Status
+
+    const rowIndex = i + 1; // 1-indexed sheet row, matches get-bookings
+    availability[rowIndex] = {};
+
+    const slots = [row[4] || '', row[5] || '', row[6] || '']; // Columns E/F/G
+    slots.forEach((slotStr, idx) => {
+      if (!slotStr) return; // empty slot → no badge
+      const key = `slot${idx + 1}`;
+      const parsed = parseSlotString(slotStr, schedule);
+      if (!parsed) {
+        availability[rowIndex][key] = 'unknown';
+        return;
+      }
+      if (new Date(parsed.startDateTime).getTime() < now) {
+        availability[rowIndex][key] = 'past';
+        return;
+      }
+      // Not past → needs a calendar check to tell available vs taken.
+      availability[rowIndex][key] = 'unknown';
+      busyChecks.push({ rowIndex, key, timeMin: parsed.startDateTime, timeMax: parsed.endDateTime });
+    });
+  }
+
+  // Run the free/busy look-ups concurrently. A failed check falls back to
+  // 'unknown' (the dashboard leaves those slots acceptable — the accept handler
+  // does the authoritative re-check on click).
+  await Promise.all(
+    busyChecks.map(async ({ rowIndex, key, timeMin, timeMax }) => {
+      try {
+        const freeBusy = await calendar.freebusy.query({
+          requestBody: {
+            timeMin,
+            timeMax,
+            timeZone: 'America/Toronto',
+            items: [{ id: calendarId }],
+          },
+        });
+        const busy = freeBusy.data.calendars[calendarId].busy || [];
+        availability[rowIndex][key] = busy.length > 0 ? 'taken' : 'available';
+      } catch (err) {
+        console.error('Slot availability check failed:', err);
+        availability[rowIndex][key] = 'unknown';
+      }
+    })
+  );
+
+  return res.status(200).json({ availability });
 }
 
 async function cancelBooking(req, res) {
