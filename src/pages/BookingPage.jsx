@@ -103,6 +103,7 @@ const BookingPage = () => {
     <main className="main-content">
       <div className="hero-section">
         <h1 className="hero-title">Book an appointment below:</h1>
+        <p className="hero-notice">Please note: colour appointments are currently unavailable until further notice.</p>
       </div>
 
       <div className="booking-container">

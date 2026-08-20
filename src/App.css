@@ -50,6 +50,17 @@
   line-height: 1.4;
 }
 
+.hero-notice {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.85rem;
+  font-style: italic;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin: 0.5rem 0 0;
+  line-height: 1.4;
+  text-shadow: 0 1px 3px rgba(200, 200, 200, 0.9), 0 0 6px rgba(200, 200, 200, 0.7);
+}
+
 .booking-container {
   max-width: 600px;
   margin: 0 auto;
