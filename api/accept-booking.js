@@ -172,24 +172,34 @@ export default async function handler(req, res) {
 
     const { startDateTime, endDateTime } = slotParsed;
 
-    // Race condition check: Verify slot is still available in Calendar
+    // A slot can't be accepted if its start time has already passed OR the
+    // calendar is already busy then. We treat both as "unavailable" so a single
+    // conflict/rebook path covers stale-and-passed slots and just-booked slots
+    // alike — and the very first click surfaces it (no need to try all three).
     const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
 
-    const freeBusy = await calendar.freebusy.query({
-      requestBody: {
-        timeMin: startDateTime,
-        timeMax: endDateTime,
-        timeZone: 'America/Toronto',
-        items: [{ id: calendarId }],
-      },
-    });
+    const selectedSlotIsPast = new Date(startDateTime).getTime() < Date.now();
 
-    const busySlots = freeBusy.data.calendars[calendarId].busy || [];
-    const isSlotTaken = busySlots.length > 0;
+    // Skip the free/busy call entirely for a past slot — it can't be booked.
+    let selectedSlotIsBusy = false;
+    if (!selectedSlotIsPast) {
+      const freeBusy = await calendar.freebusy.query({
+        requestBody: {
+          timeMin: startDateTime,
+          timeMax: endDateTime,
+          timeZone: 'America/Toronto',
+          items: [{ id: calendarId }],
+        },
+      });
 
-    if (isSlotTaken) {
-      // Slot is already booked - figure out which of the OTHER requested slots
-      // are still genuinely free (don't just blindly offer the links).
+      const busySlots = freeBusy.data.calendars[calendarId].busy || [];
+      selectedSlotIsBusy = busySlots.length > 0;
+    }
+
+    if (selectedSlotIsPast || selectedSlotIsBusy) {
+      // The clicked slot is unavailable. Figure out which of the OTHER requested
+      // slots are still genuinely bookable — not passed, not busy — so we only
+      // offer links that will actually work.
       const baseUrl = process.env.BASE_URL || 'http://localhost:5173';
       const availableAlternatives = [];
 
@@ -198,6 +208,9 @@ export default async function handler(req, res) {
 
         const altParsed = parseSlotString(slots[i], schedule);
         if (!altParsed) continue;
+
+        // A slot whose start time has passed can't be offered as an alternative.
+        if (new Date(altParsed.startDateTime).getTime() < Date.now()) continue;
 
         const altFreeBusy = await calendar.freebusy.query({
           requestBody: {
@@ -214,8 +227,14 @@ export default async function handler(req, res) {
         }
       }
 
-      // If at least one other slot is still free, offer it. Keep the status as
-      // 'pending_acceptance' so the alternative Accept links below still pass
+      // Tailor the heading to *why* the clicked slot failed (passed vs. booked).
+      const failHeading = selectedSlotIsPast ? 'Slot Has Passed' : 'Slot Already Booked';
+      const failMessage = selectedSlotIsPast
+        ? `Sorry, this slot is in the past. You can't accept it.`
+        : `Unfortunately, this time slot was just booked by someone else.`;
+
+      // If at least one other slot is still bookable, offer it. Keep the status
+      // as 'pending_acceptance' so the alternative Accept links below still pass
       // the idempotency check and can be accepted.
       if (availableAlternatives.length > 0) {
         const alternativeLinks = availableAlternatives.map(({ index, slot }) => `
@@ -226,8 +245,8 @@ export default async function handler(req, res) {
         return res.status(409).send(`
           <html>
             <body>
-              <h1>Slot Already Booked</h1>
-              <p>Unfortunately, this time slot was just booked by someone else.</p>
+              <h1>${failHeading}</h1>
+              <p>${failMessage}</p>
               <h2>These alternative slots are still available:</h2>
               ${alternativeLinks.join('')}
             </body>
