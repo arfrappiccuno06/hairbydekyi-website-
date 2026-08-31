@@ -161,3 +161,128 @@ export function findSlotByTime(dateString, timeString, schedule) {
   // Find slot with matching label
   return slots.find(slot => slot.label === timeString) || null;
 }
+
+/**
+ * Parse a slot string like "Monday, June 16 at 09:00 AM" into ISO datetimes.
+ * Returns { startDateTime, endDateTime } (Toronto offset), or null if unparseable.
+ * The slot's duration comes from the Schedule tab; falls back to 90 min.
+ *
+ * Shared by api/accept-booking.js, api/check-deposits.js and
+ * api/admin/operations.js so the parsing lives in exactly one place.
+ */
+export function parseSlotString(slotString, schedule) {
+  try {
+    // Expected format: "Monday, June 16 at 09:00 AM"
+    const match = slotString.match(/(\w+,\s+\w+\s+\d+)\s+at\s+(\d+:\d+\s+[AP]M)/i);
+
+    if (!match) {
+      return null;
+    }
+
+    const dateStr = match[1]; // "Monday, June 16"
+    const timeStr = match[2]; // "09:00 AM"
+
+    // Parse date to get YYYY-MM-DD format (but NOT as a Date object yet)
+    const currentYear = new Date().getFullYear();
+    const tempFullDateStr = `${dateStr}, ${currentYear}`;
+    const tempDate = new Date(tempFullDateStr);
+
+    if (isNaN(tempDate.getTime())) {
+      return null;
+    }
+
+    // Get date in YYYY-MM-DD format
+    const year = tempDate.getFullYear();
+    const month = String(tempDate.getMonth() + 1).padStart(2, '0');
+    const day = String(tempDate.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+
+    // Parse time string to get hour and minute
+    const timeMatch = timeStr.match(/(\d+):(\d+)\s+([AP]M)/i);
+    if (!timeMatch) {
+      return null;
+    }
+
+    let hour = parseInt(timeMatch[1], 10);
+    const minute = parseInt(timeMatch[2], 10);
+    const period = timeMatch[3].toUpperCase();
+
+    // Convert to 24-hour format
+    if (period === 'PM' && hour !== 12) {
+      hour += 12;
+    } else if (period === 'AM' && hour === 12) {
+      hour = 0;
+    }
+
+    // Look up slot configuration from Schedule to get actual end time
+    const slotConfig = findSlotByTime(dateString, timeStr, schedule);
+
+    if (!slotConfig) {
+      console.warn(`Slot not found in schedule for ${dateString} at ${timeStr}, using 90min default`);
+      // Fallback to 90 minutes if slot not found in schedule
+      const startDateTime = createTorontoDateTime(dateString, hour, minute);
+      const endDateTime = createTorontoDateTime(dateString, hour, minute + 90);
+      return {
+        startDateTime,
+        endDateTime,
+      };
+    }
+
+    // Create start and end datetimes in Toronto timezone
+    const startDateTime = createTorontoDateTime(dateString, hour, minute);
+    const endDateTime = createTorontoDateTime(dateString, slotConfig.endHour, slotConfig.endMinute);
+
+    return {
+      startDateTime,
+      endDateTime,
+    };
+  } catch (error) {
+    console.error('Error parsing slot string:', error);
+    return null;
+  }
+}
+
+/**
+ * Find the nth occurrence of a weekday in a month.
+ * @param {number} year - Year
+ * @param {number} month - Month (1-12)
+ * @param {number} n - Which occurrence (1 = first, 2 = second, etc.)
+ * @param {number} weekday - Day of week (0 = Sunday, 6 = Saturday)
+ * @returns {Date} Date object for the nth weekday
+ */
+function getNthWeekday(year, month, n, weekday) {
+  const firstDay = new Date(year, month - 1, 1);
+  const firstWeekday = 1 + ((weekday - firstDay.getDay() + 7) % 7);
+  return new Date(year, month - 1, firstWeekday + (n - 1) * 7);
+}
+
+/**
+ * Create an ISO datetime string in America/Toronto timezone.
+ * Properly handles DST transitions (2nd Sunday in March, 1st Sunday in November).
+ * @param {string} dateString - Date in YYYY-MM-DD format
+ * @param {number} hour - Hour (0-23)
+ * @param {number} minute - Minute (0-59)
+ * @returns {string} ISO datetime string with Toronto timezone offset
+ */
+function createTorontoDateTime(dateString, hour, minute) {
+  const [year, month, day] = dateString.split('-').map(Number);
+
+  // DST transitions in America/Toronto:
+  // Starts: 2nd Sunday in March at 2:00 AM → EDT (-04:00)
+  // Ends: 1st Sunday in November at 2:00 AM → EST (-05:00)
+  const dstStart = getNthWeekday(year, 3, 2, 0); // 2nd Sunday in March
+  const dstEnd = getNthWeekday(year, 11, 1, 0); // 1st Sunday in November
+
+  const currentDate = new Date(year, month - 1, day);
+  const isDST = currentDate >= dstStart && currentDate < dstEnd;
+  const offset = isDST ? '-04:00' : '-05:00';
+
+  // Handle minute overflow (e.g., minute = 150 = 2 hours 30 minutes)
+  const totalMinutes = hour * 60 + minute;
+  const finalHour = Math.floor(totalMinutes / 60) % 24;
+  const finalMinute = totalMinutes % 60;
+
+  // Create ISO string with Toronto timezone offset
+  const isoString = `${dateString}T${String(finalHour).padStart(2, '0')}:${String(finalMinute).padStart(2, '0')}:00${offset}`;
+  return isoString;
+}
